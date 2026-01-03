@@ -1,0 +1,13 @@
+[package]
+name = "microstrain-inertial"
+authors = ["Jeff McBride <jeff@jeffmcbride.net>"]
+description = "Library for communicating with Microstrain IMUs via MIP"
+keywords = ["no_std", "embedded", "parser"]
+categories = ["embedded", "no-std", "no-std::no-alloc"]
+
+version = "0.0.1"
+edition = "2024"
+
+[dependencies]
+fletcher = "1.0.0"
+thiserror = "2.0.17"
