@@ -14,6 +14,7 @@ pub enum ParseError {
     UnexpectedByte,
 }
 
+#[allow(clippy::len_without_is_empty)]
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct RawMessage<'a> {
     buf: &'a [u8],
@@ -52,6 +53,12 @@ enum ParseState {
     Payload(u8),
     CheckH,
     CheckL,
+}
+
+impl Default for MessageParser {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl MessageParser {

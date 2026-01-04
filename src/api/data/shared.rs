@@ -61,7 +61,7 @@ impl EventSource {
     pub const LEN: usize = 1;
 
     pub fn from_bytes(bytes: &[u8]) -> Result<Self, Error> {
-        ensure_len(&bytes, Self::DESCRIPTOR, Self::LEN)?;
+        ensure_len(bytes, Self::DESCRIPTOR, Self::LEN)?;
         let mut b = bytes;
         Ok(Self {
             trigger_id: b.read_u8(),
@@ -79,7 +79,7 @@ impl Ticks {
     pub const LEN: usize = 4;
 
     pub fn from_bytes(bytes: &[u8]) -> Result<Self, Error> {
-        ensure_len(&bytes, Self::DESCRIPTOR, Self::LEN)?;
+        ensure_len(bytes, Self::DESCRIPTOR, Self::LEN)?;
         let mut b = bytes;
         Ok(Self {
             ticks: b.read_u32(),
@@ -97,7 +97,7 @@ impl DeltaTicks {
     pub const LEN: usize = 4;
 
     pub fn from_bytes(bytes: &[u8]) -> Result<Self, Error> {
-        ensure_len(&bytes, Self::DESCRIPTOR, Self::LEN)?;
+        ensure_len(bytes, Self::DESCRIPTOR, Self::LEN)?;
         let mut b = bytes;
         Ok(Self {
             delta_ticks: b.read_u32(),
@@ -120,7 +120,7 @@ impl GpsTimestamp {
     pub const LEN: usize = 8 + 2 + 2; // 12
 
     pub fn from_bytes(bytes: &[u8]) -> Result<Self, Error> {
-        ensure_len(&bytes, Self::DESCRIPTOR, Self::LEN)?;
+        ensure_len(bytes, Self::DESCRIPTOR, Self::LEN)?;
         let mut b = bytes;
         Ok(Self {
             tow_s: b.read_f64(),
@@ -159,7 +159,7 @@ impl DeltaTime {
     pub const LEN: usize = 8;
 
     pub fn from_bytes(bytes: &[u8]) -> Result<Self, Error> {
-        ensure_len(&bytes, Self::DESCRIPTOR, Self::LEN)?;
+        ensure_len(bytes, Self::DESCRIPTOR, Self::LEN)?;
         let mut b = bytes;
         Ok(Self { dt_s: b.read_f64() })
     }
@@ -175,7 +175,7 @@ impl ReferenceTimestamp {
     pub const LEN: usize = 8;
 
     pub fn from_bytes(bytes: &[u8]) -> Result<Self, Error> {
-        ensure_len(&bytes, Self::DESCRIPTOR, Self::LEN)?;
+        ensure_len(bytes, Self::DESCRIPTOR, Self::LEN)?;
         let mut b = bytes;
         Ok(Self {
             ticks: b.read_u64(),
@@ -194,7 +194,7 @@ impl ReferenceTimeDelta {
     pub const LEN: usize = 8;
 
     pub fn from_bytes(bytes: &[u8]) -> Result<Self, Error> {
-        ensure_len(&bytes, Self::DESCRIPTOR, Self::LEN)?;
+        ensure_len(bytes, Self::DESCRIPTOR, Self::LEN)?;
         let mut b = bytes;
         Ok(Self { dt_s: b.read_f64() })
     }
@@ -212,7 +212,7 @@ impl ExternalTimestamp {
     pub const LEN: usize = 8 + 2; // 10
 
     pub fn from_bytes(bytes: &[u8]) -> Result<Self, Error> {
-        ensure_len(&bytes, Self::DESCRIPTOR, Self::LEN)?;
+        ensure_len(bytes, Self::DESCRIPTOR, Self::LEN)?;
         let mut b = bytes;
         Ok(Self {
             time: b.read_u64(),
@@ -246,7 +246,7 @@ impl ExternalTimeDelta {
     pub const LEN: usize = 8 + 2; // 10
 
     pub fn from_bytes(bytes: &[u8]) -> Result<Self, Error> {
-        ensure_len(&bytes, Self::DESCRIPTOR, Self::LEN)?;
+        ensure_len(bytes, Self::DESCRIPTOR, Self::LEN)?;
         let mut b = bytes;
         Ok(Self {
             dt: b.read_i64(),
