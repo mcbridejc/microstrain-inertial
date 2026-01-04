@@ -1,6 +1,8 @@
 //! Filter descriptor set (0x82) data fields (full coverage).
 
-use crate::api::data::{Matrix3f, Quatf, Vector3d, Vector3f};
+use crate::api::data::{
+    FieldIter, FieldParse, Matrix3f, Quatf, Vector3d, Vector3f, shared::SharedField,
+};
 
 use super::{Error, ReadBuf, ensure_len};
 
@@ -15,59 +17,16 @@ impl<'a> FilterPacket<'a> {
         Self { payload }
     }
 
-    pub fn fields(&self) -> FilterFieldIter<'a> {
-        FilterFieldIter {
+    pub fn fields(&self) -> FieldIter<'a, FilterField> {
+        FieldIter {
             remaining: self.payload,
+            _marker: Default::default(),
         }
-    }
-}
-
-pub struct FilterFieldIter<'a> {
-    remaining: &'a [u8],
-}
-
-impl<'a> Iterator for FilterFieldIter<'a> {
-    type Item = Result<FilterField, Error>;
-
-    fn next(&mut self) -> Option<Self::Item> {
-        if self.remaining.is_empty() {
-            return None;
-        }
-
-        if self.remaining.len() < 2 {
-            let err = Error::LenTooShort {
-                descriptor_set: FILTER_DESCRIPTOR_SET,
-                descriptor: 0,
-                need: 2,
-                got: self.remaining.len(),
-            };
-            self.remaining = &[];
-            return Some(Err(err));
-        }
-
-        let mut buf = self.remaining;
-        let field_len = buf.read_u8() as usize;
-        let descriptor = buf.read_u8();
-
-        if buf.len() < field_len {
-            let err = Error::LenTooShort {
-                descriptor_set: FILTER_DESCRIPTOR_SET,
-                descriptor,
-                need: field_len,
-                got: buf.len(),
-            };
-            self.remaining = &[];
-            return Some(Err(err));
-        }
-
-        let (payload, rest) = buf.split_at(field_len);
-        self.remaining = rest;
-        Some(FilterField::parse(descriptor, payload))
     }
 }
 
 /// A parsed Filter (0x82) data field.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy, PartialEq)]
 pub enum FilterField {
     LlhPosition(LlhPosition),                                     // 0x01
     VelocityNed(VelocityNed),                                     // 0x02
@@ -104,16 +63,17 @@ pub enum FilterField {
     GnssDualAntennaStatus(GnssDualAntennaStatus),                 // 0x49
     AidingFrameConfigurationError(AidingFrameConfigurationError), // 0x50
     AidingFrameConfigurationErrorUncertainty(AidingFrameConfigurationErrorUncertainty), // 0x51
-
+    Shared(SharedField),
     /// Any unrecognized field descriptor for set 0x82.
     Unknown {
         descriptor: u8,
     },
 }
 
-impl FilterField {
-    /// Parse a single Filter (0x82) field given the *field descriptor* and its raw field payload bytes.
-    pub fn parse(descriptor: u8, bytes: &[u8]) -> Result<Self, Error> {
+impl FieldParse for FilterField {
+    const DESCRIPTOR_SET: u8 = FILTER_DESCRIPTOR_SET;
+
+    fn parse(descriptor: u8, bytes: &[u8]) -> Result<Self, Error> {
         Ok(match descriptor {
             LlhPosition::DESCRIPTOR => Self::LlhPosition(LlhPosition::from_bytes(bytes)?),
             VelocityNed::DESCRIPTOR => Self::VelocityNed(VelocityNed::from_bytes(bytes)?),
@@ -207,8 +167,13 @@ impl FilterField {
                     AidingFrameConfigurationErrorUncertainty::from_bytes(bytes)?,
                 )
             }
-
-            other => Self::Unknown { descriptor: other },
+            other => {
+                // Try to parse it as shared, and if that fails, it is an unknown field
+                match SharedField::parse(descriptor, bytes) {
+                    Ok(field) => Self::Shared(field),
+                    Err(_) => Self::Unknown { descriptor: other },
+                }
+            }
         })
     }
 }

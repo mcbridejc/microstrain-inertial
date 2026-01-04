@@ -1,6 +1,6 @@
 //! Sensor descriptor set (0x80) data fields.
 
-use crate::api::data::{Matrix3f, Quatf, Vector3f};
+use crate::api::data::{FieldIter, FieldParse, Matrix3f, Quatf, Vector3f, shared::SharedField};
 
 use super::{Error, ReadBuf, ensure_len};
 
@@ -15,59 +15,16 @@ impl<'a> SensorPacket<'a> {
         Self { payload }
     }
 
-    pub fn fields(&self) -> SensorFieldIter<'a> {
-        SensorFieldIter {
+    pub fn fields(&self) -> FieldIter<'a, SensorField> {
+        FieldIter {
             remaining: self.payload,
+            _marker: Default::default(),
         }
-    }
-}
-
-pub struct SensorFieldIter<'a> {
-    remaining: &'a [u8],
-}
-
-impl<'a> Iterator for SensorFieldIter<'a> {
-    type Item = Result<SensorField, Error>;
-
-    fn next(&mut self) -> Option<Self::Item> {
-        if self.remaining.is_empty() {
-            return None;
-        }
-
-        if self.remaining.len() < 2 {
-            let err = Error::LenTooShort {
-                descriptor_set: SENSOR_DESCRIPTOR_SET,
-                descriptor: 0,
-                need: 2,
-                got: self.remaining.len(),
-            };
-            self.remaining = &[];
-            return Some(Err(err));
-        }
-
-        let mut buf = self.remaining;
-        let field_len = buf.read_u8() as usize;
-        let descriptor = buf.read_u8();
-
-        if buf.len() < field_len {
-            let err = Error::LenTooShort {
-                descriptor_set: SENSOR_DESCRIPTOR_SET,
-                descriptor,
-                need: field_len,
-                got: buf.len(),
-            };
-            self.remaining = &[];
-            return Some(Err(err));
-        }
-
-        let (payload, rest) = buf.split_at(field_len);
-        self.remaining = rest;
-        Some(SensorField::parse(descriptor, payload))
     }
 }
 
 /// A parsed Sensor (0x80) data field.
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq)]
 pub enum SensorField {
     RawAccel(RawAccel),                           // 0x01
     RawGyro(RawGyro),                             // 0x02
@@ -81,12 +38,6 @@ pub enum SensorField {
     CompQuaternion(CompQuaternion),               // 0x0A
     CompEulerAngles(CompEulerAngles),             // 0x0C
 
-    // Deprecated (still seen on some devices/firmwares)
-    CompOrientationUpdateMatrix(CompOrientationUpdateMatrix), // 0x0B (deprecated)
-    OrientationRawTemp(OrientationRawTemp),                   // 0x0D (deprecated on some)
-    InternalTimestamp(InternalTimestamp),                     // 0x0E (deprecated on some)
-    PpsTimestamp(PpsTimestamp),                               // 0x0F (deprecated on some)
-
     NorthVector(NorthVector),         // 0x10
     UpVector(UpVector),               // 0x11
     GpsTimestamp(GpsTimestamp),       // 0x12
@@ -96,6 +47,7 @@ pub enum SensorField {
     OverrangeStatus(OverrangeStatus), // 0x18
     OdometerData(OdometerData),       // 0x40
 
+    Shared(SharedField),
     /// Any unrecognized field descriptor for set 0x80.
     ///
     /// This keeps your parser forward-compatible with newer firmware / products.
@@ -104,9 +56,10 @@ pub enum SensorField {
     },
 }
 
-impl SensorField {
-    /// Parse a single Sensor (0x80) field given the *field descriptor* and its raw field payload bytes.
-    pub fn parse(descriptor: u8, bytes: &[u8]) -> Result<Self, Error> {
+impl FieldParse for SensorField {
+    const DESCRIPTOR_SET: u8 = SENSOR_DESCRIPTOR_SET;
+
+    fn parse(descriptor: u8, bytes: &[u8]) -> Result<Self, Error> {
         Ok(match descriptor {
             RawAccel::DESCRIPTOR => Self::RawAccel(RawAccel::from_bytes(bytes)?),
             RawGyro::DESCRIPTOR => Self::RawGyro(RawGyro::from_bytes(bytes)?),
@@ -124,17 +77,6 @@ impl SensorField {
                 Self::CompEulerAngles(CompEulerAngles::from_bytes(bytes)?)
             }
 
-            CompOrientationUpdateMatrix::DESCRIPTOR => {
-                Self::CompOrientationUpdateMatrix(CompOrientationUpdateMatrix::from_bytes(bytes)?)
-            }
-            OrientationRawTemp::DESCRIPTOR => {
-                Self::OrientationRawTemp(OrientationRawTemp::from_bytes(bytes)?)
-            }
-            InternalTimestamp::DESCRIPTOR => {
-                Self::InternalTimestamp(InternalTimestamp::from_bytes(bytes)?)
-            }
-            PpsTimestamp::DESCRIPTOR => Self::PpsTimestamp(PpsTimestamp::from_bytes(bytes)?),
-
             NorthVector::DESCRIPTOR => Self::NorthVector(NorthVector::from_bytes(bytes)?),
             UpVector::DESCRIPTOR => Self::UpVector(UpVector::from_bytes(bytes)?),
             GpsTimestamp::DESCRIPTOR => Self::GpsTimestamp(GpsTimestamp::from_bytes(bytes)?),
@@ -146,7 +88,13 @@ impl SensorField {
             }
             OdometerData::DESCRIPTOR => Self::OdometerData(OdometerData::from_bytes(bytes)?),
 
-            other => Self::Unknown { descriptor: other },
+            other => {
+                // Try to parse it as shared, and if that fails, it is an unknown field
+                match SharedField::parse(descriptor, bytes) {
+                    Ok(field) => Self::Shared(field),
+                    Err(_) => Self::Unknown { descriptor: other },
+                }
+            }
         })
     }
 }

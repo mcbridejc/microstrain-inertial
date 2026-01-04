@@ -67,7 +67,6 @@ impl MessageParser {
     }
 
     fn shift_buf(&mut self, n: usize) {
-        println!("Shift {n}");
         for i in 0..self.buf.len() - n {
             self.buf[i] = self.buf[i + n];
         }
@@ -173,7 +172,6 @@ impl MessageParser {
         pending_bytes: &mut Option<(usize, usize)>,
         b: u8,
     ) -> Result<Option<usize>, ParseError> {
-        println!("{:?}: {b}", state);
         match state {
             ParseState::Sync1 => {
                 if b == Self::SYNC1 {
@@ -201,7 +199,6 @@ impl MessageParser {
             ParseState::Length => {
                 buf[1] = b;
                 *state = ParseState::Payload(0);
-                println!("Got len {b}");
                 Ok(None)
             }
             ParseState::Payload(i) => {
@@ -232,10 +229,8 @@ impl MessageParser {
                     ((buf[payload_len + 2] as u16) << 8) | buf[payload_len + 3] as u16;
                 if chk16.value() == message_chk {
                     *state = ParseState::Sync1;
-                    println!("return message");
                     Ok(Some(payload_len + 2))
                 } else {
-                    println!("CRC error");
                     *state = ParseState::Sync1;
                     *pending_bytes = Some((0, payload_len + 4));
                     // Return the CRC error for now. Future bytes will be scanned on next call.
@@ -256,7 +251,6 @@ mod tests {
         let mut msg = crate::serialize::OwnedMessage::new(0x10, &count_payload);
         let mut parser = MessageParser::new();
 
-        println!("{:?}", msg.as_slice());
         let mut parsed = None;
         for (i, b) in msg.as_slice().iter().enumerate() {
             match parser.push_byte(*b) {
@@ -293,10 +287,8 @@ mod tests {
             .map(|m| m.as_slice())
             .flatten()
         {
-            println!("Pushing byte");
             match parser.push_byte(*byte) {
                 Ok(Some(m)) => {
-                    println!("Got message in test");
                     messages.push(m.to_owned());
                 }
                 Ok(None) => (),
