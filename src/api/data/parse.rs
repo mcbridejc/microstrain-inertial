@@ -57,56 +57,56 @@ impl ReadBuf for &[u8] {
 
     #[inline]
     fn read_u16(&mut self) -> u16 {
-        let v = u16::from_le_bytes(self[..2].try_into().unwrap());
+        let v = u16::from_be_bytes(self[..2].try_into().unwrap());
         *self = &self[2..];
         v
     }
 
     #[inline]
     fn read_i16(&mut self) -> i16 {
-        let v = i16::from_le_bytes(self[..2].try_into().unwrap());
+        let v = i16::from_be_bytes(self[..2].try_into().unwrap());
         *self = &self[2..];
         v
     }
 
     #[inline]
     fn read_u32(&mut self) -> u32 {
-        let v = u32::from_le_bytes(self[..4].try_into().unwrap());
+        let v = u32::from_be_bytes(self[..4].try_into().unwrap());
         *self = &self[4..];
         v
     }
 
     #[inline]
     fn read_i32(&mut self) -> i32 {
-        let v = i32::from_le_bytes(self[..4].try_into().unwrap());
+        let v = i32::from_be_bytes(self[..4].try_into().unwrap());
         *self = &self[4..];
         v
     }
 
     #[inline]
     fn read_u64(&mut self) -> u64 {
-        let v = u64::from_le_bytes(self[..8].try_into().unwrap());
+        let v = u64::from_be_bytes(self[..8].try_into().unwrap());
         *self = &self[8..];
         v
     }
 
     #[inline]
     fn read_i64(&mut self) -> i64 {
-        let v = i64::from_le_bytes(self[..8].try_into().unwrap());
+        let v = i64::from_be_bytes(self[..8].try_into().unwrap());
         *self = &self[8..];
         v
     }
 
     #[inline]
     fn read_f32(&mut self) -> f32 {
-        let v = f32::from_le_bytes(self[..4].try_into().unwrap());
+        let v = f32::from_be_bytes(self[..4].try_into().unwrap());
         *self = &self[4..];
         v
     }
 
     #[inline]
     fn read_f64(&mut self) -> f64 {
-        let v = f64::from_le_bytes(self[..8].try_into().unwrap());
+        let v = f64::from_be_bytes(self[..8].try_into().unwrap());
         *self = &self[8..];
         v
     }

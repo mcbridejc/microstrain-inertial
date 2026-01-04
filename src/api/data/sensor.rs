@@ -2,9 +2,69 @@
 
 use crate::api::data::{Matrix3f, Quatf, Vector3f};
 
-use super::{ensure_len, Error, ReadBuf};
+use super::{Error, ReadBuf, ensure_len};
 
 pub const SENSOR_DESCRIPTOR_SET: u8 = 0x80;
+
+pub struct SensorPacket<'a> {
+    payload: &'a [u8],
+}
+
+impl<'a> SensorPacket<'a> {
+    pub fn new(payload: &'a [u8]) -> Self {
+        Self { payload }
+    }
+
+    pub fn fields(&self) -> SensorFieldIter<'a> {
+        SensorFieldIter {
+            remaining: self.payload,
+        }
+    }
+}
+
+pub struct SensorFieldIter<'a> {
+    remaining: &'a [u8],
+}
+
+impl<'a> Iterator for SensorFieldIter<'a> {
+    type Item = Result<SensorField, Error>;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        if self.remaining.is_empty() {
+            return None;
+        }
+
+        if self.remaining.len() < 2 {
+            let err = Error::LenTooShort {
+                descriptor_set: SENSOR_DESCRIPTOR_SET,
+                descriptor: 0,
+                need: 2,
+                got: self.remaining.len(),
+            };
+            self.remaining = &[];
+            return Some(Err(err));
+        }
+
+        let mut buf = self.remaining;
+        let field_len = buf.read_u8() as usize;
+        let descriptor = buf.read_u8();
+
+        if buf.len() < field_len {
+            let err = Error::LenTooShort {
+                descriptor_set: SENSOR_DESCRIPTOR_SET,
+                descriptor,
+                need: field_len,
+                got: buf.len(),
+            };
+            self.remaining = &[];
+            return Some(Err(err));
+        }
+
+        let (payload, rest) = buf.split_at(field_len);
+        self.remaining = rest;
+        Some(SensorField::parse(descriptor, payload))
+    }
+}
 
 /// A parsed Sensor (0x80) data field.
 #[derive(Debug, Clone, Copy)]
@@ -91,13 +151,12 @@ impl SensorField {
     }
 }
 
-
 // -------------------------
 // Field structs
 // -------------------------
 
 /// (0x80, 0x01) Raw Accel
-#[derive(Debug, Copy, Clone)]
+#[derive(Debug, Copy, Clone, PartialEq)]
 pub struct RawAccel {
     /// Native sensor counts (represented as float in the MicroStrain C API type `mip_vector3f`).
     pub raw_accel: Vector3f,
@@ -113,7 +172,7 @@ impl RawAccel {
 }
 
 /// (0x80, 0x02) Raw Gyro
-#[derive(Debug, Copy, Clone)]
+#[derive(Debug, Copy, Clone, PartialEq)]
 pub struct RawGyro {
     pub raw_gyro: Vector3f,
 }
@@ -128,7 +187,7 @@ impl RawGyro {
 }
 
 /// (0x80, 0x03) Raw Mag
-#[derive(Debug, Copy, Clone)]
+#[derive(Debug, Copy, Clone, PartialEq)]
 pub struct RawMag {
     pub raw_mag: Vector3f,
 }
@@ -143,7 +202,7 @@ impl RawMag {
 }
 
 /// (0x80, 0x04) Scaled Accel (g)
-#[derive(Debug, Copy, Clone)]
+#[derive(Debug, Copy, Clone, PartialEq)]
 pub struct ScaledAccel {
     pub scaled_accel: Vector3f,
 }
@@ -158,7 +217,7 @@ impl ScaledAccel {
 }
 
 /// (0x80, 0x05) Scaled Gyro (rad/s)
-#[derive(Debug, Copy, Clone)]
+#[derive(Debug, Copy, Clone, PartialEq)]
 pub struct ScaledGyro {
     pub scaled_gyro: Vector3f,
 }
@@ -173,7 +232,7 @@ impl ScaledGyro {
 }
 
 /// (0x80, 0x06) Scaled Mag (Gauss)
-#[derive(Debug, Copy, Clone)]
+#[derive(Debug, Copy, Clone, PartialEq)]
 pub struct ScaledMag {
     pub scaled_mag: Vector3f,
 }
@@ -188,7 +247,7 @@ impl ScaledMag {
 }
 
 /// (0x80, 0x07) Delta Theta (rad)
-#[derive(Debug, Copy, Clone)]
+#[derive(Debug, Copy, Clone, PartialEq)]
 pub struct DeltaTheta {
     pub delta_theta: Vector3f,
 }
@@ -203,7 +262,7 @@ impl DeltaTheta {
 }
 
 /// (0x80, 0x08) Delta Velocity (g*sec)
-#[derive(Debug, Copy, Clone)]
+#[derive(Debug, Copy, Clone, PartialEq)]
 pub struct DeltaVelocity {
     pub delta_velocity: Vector3f,
 }
@@ -212,13 +271,14 @@ impl DeltaVelocity {
 
     pub fn from_bytes(bytes: &[u8]) -> Result<Self, Error> {
         let mut b = bytes;
-        let delta_velocity = Vector3f::read_from(&mut b, (SENSOR_DESCRIPTOR_SET, Self::DESCRIPTOR))?;
+        let delta_velocity =
+            Vector3f::read_from(&mut b, (SENSOR_DESCRIPTOR_SET, Self::DESCRIPTOR))?;
         Ok(Self { delta_velocity })
     }
 }
 
 /// (0x80, 0x09) Comp Orientation Matrix (row-major)
-#[derive(Debug, Copy, Clone)]
+#[derive(Debug, Copy, Clone, PartialEq)]
 pub struct CompOrientationMatrix {
     pub m: Matrix3f,
 }
@@ -233,7 +293,7 @@ impl CompOrientationMatrix {
 }
 
 /// (0x80, 0x0A) Comp Quaternion (w, x, y, z)
-#[derive(Debug, Copy, Clone)]
+#[derive(Debug, Copy, Clone, PartialEq)]
 pub struct CompQuaternion {
     pub q: Quatf,
 }
@@ -248,7 +308,7 @@ impl CompQuaternion {
 }
 
 /// (0x80, 0x0B) Comp Orientation Update Matrix (deprecated) - float[9]
-#[derive(Debug, Copy, Clone)]
+#[derive(Debug, Copy, Clone, PartialEq)]
 pub struct CompOrientationUpdateMatrix {
     pub m: Matrix3f,
 }
@@ -263,7 +323,7 @@ impl CompOrientationUpdateMatrix {
 }
 
 /// (0x80, 0x0C) Comp Euler Angles (roll, pitch, yaw) in radians
-#[derive(Debug, Copy, Clone)]
+#[derive(Debug, Copy, Clone, PartialEq)]
 pub struct CompEulerAngles {
     pub roll: f32,
     pub pitch: f32,
@@ -283,7 +343,7 @@ impl CompEulerAngles {
 }
 
 /// (0x80, 0x0D) Orientation Raw Temp (deprecated) - u16[4]
-#[derive(Debug, Copy, Clone)]
+#[derive(Debug, Copy, Clone, PartialEq)]
 pub struct OrientationRawTemp {
     pub raw_temp: [u16; 4],
 }
@@ -299,7 +359,7 @@ impl OrientationRawTemp {
 }
 
 /// (0x80, 0x0E) Internal Timestamp (deprecated) - u32 counts
-#[derive(Debug, Copy, Clone)]
+#[derive(Debug, Copy, Clone, PartialEq)]
 pub struct InternalTimestamp {
     pub counts: u32,
 }
@@ -316,7 +376,7 @@ impl InternalTimestamp {
 }
 
 /// (0x80, 0x0F) PPS Timestamp (deprecated) - u32 seconds + u32 useconds
-#[derive(Debug, Copy, Clone)]
+#[derive(Debug, Copy, Clone, PartialEq)]
 pub struct PpsTimestamp {
     pub seconds: u32,
     pub useconds: u32,
@@ -334,7 +394,7 @@ impl PpsTimestamp {
 }
 
 /// (0x80, 0x10) North Vector (Gauss)
-#[derive(Debug, Copy, Clone)]
+#[derive(Debug, Copy, Clone, PartialEq)]
 pub struct NorthVector {
     pub north: Vector3f,
 }
@@ -349,7 +409,7 @@ impl NorthVector {
 }
 
 /// (0x80, 0x11) Up Vector (Gs)
-#[derive(Debug, Copy, Clone)]
+#[derive(Debug, Copy, Clone, PartialEq)]
 pub struct UpVector {
     pub up: Vector3f,
 }
@@ -364,7 +424,7 @@ impl UpVector {
 }
 
 /// (0x80, 0x12) GPS Timestamp
-#[derive(Debug, Copy, Clone)]
+#[derive(Debug, Copy, Clone, PartialEq)]
 pub struct GpsTimestamp {
     /// GPS time-of-week [seconds]
     pub tow: f64,
@@ -409,7 +469,7 @@ impl GpsTimestampValidFlags {
 }
 
 /// (0x80, 0x14) Temperature Abs (degC)
-#[derive(Debug, Copy, Clone)]
+#[derive(Debug, Copy, Clone, PartialEq)]
 pub struct TemperatureAbs {
     pub min_temp: f32,
     pub max_temp: f32,
@@ -433,7 +493,7 @@ impl TemperatureAbs {
 }
 
 /// (0x80, 0x16) Raw Pressure
-#[derive(Debug, Copy, Clone)]
+#[derive(Debug, Copy, Clone, PartialEq)]
 pub struct RawPressure {
     pub raw_pressure: f32,
 }
@@ -450,7 +510,7 @@ impl RawPressure {
 }
 
 /// (0x80, 0x17) Scaled Pressure (mBar)
-#[derive(Debug, Copy, Clone)]
+#[derive(Debug, Copy, Clone, PartialEq)]
 pub struct ScaledPressure {
     pub scaled_pressure: f32,
 }
@@ -467,7 +527,7 @@ impl ScaledPressure {
 }
 
 /// (0x80, 0x18) Overrange Status
-#[derive(Debug, Copy, Clone)]
+#[derive(Debug, Copy, Clone, PartialEq)]
 pub struct OverrangeStatus {
     pub status: OverrangeStatusFlags,
 }
@@ -512,7 +572,7 @@ impl OverrangeStatusFlags {
 }
 
 /// (0x80, 0x40) Odometer Data
-#[derive(Debug, Copy, Clone)]
+#[derive(Debug, Copy, Clone, PartialEq)]
 pub struct OdometerData {
     /// Average speed over the time interval [m/s] (may be negative for quadrature encoders)
     pub speed: f32,
