@@ -10,9 +10,7 @@ use microstrain_inertial::{
             sensor::{CompQuaternion, SENSOR_DESCRIPTOR_SET, ScaledAccel, SensorField},
             shared::{DeltaTime, GpsTimestamp, GpsTimestampValidFlags, SharedField},
         },
-    },
-    parser::MessageParser,
-    serialize::OwnedMessage,
+    }, checksum::Checksum, framer::MessageParser, serialize::OwnedMessage
 };
 
 const SYNC: [u8; 2] = [0x75, 0x65];
@@ -124,7 +122,7 @@ fn frame_payload(descriptor_set: u8, payload: &[u8]) -> Vec<u8> {
     frame.push(descriptor_set);
     frame.push(payload.len() as u8);
     frame.extend_from_slice(payload);
-    let crc = fletcher::calc_fletcher16(&frame);
+    let crc = Checksum::calc_checksum(&frame);
     frame.extend_from_slice(&crc.to_be_bytes());
     frame
 }

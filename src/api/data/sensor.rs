@@ -1,8 +1,9 @@
 //! Sensor descriptor set (0x80) data fields.
 
-use crate::api::data::{FieldIter, FieldParse, Matrix3f, Quatf, Vector3f, shared::SharedField};
+use crate::api::data::{Matrix3f, Quatf, Vector3f, shared::SharedField};
+use crate::fields::{FieldIter, FieldParse};
 
-use super::{Error, ReadBuf, ensure_len};
+use super::{ParseError, ReadBuf, ensure_len};
 
 pub const SENSOR_DESCRIPTOR_SET: u8 = 0x80;
 
@@ -16,10 +17,7 @@ impl<'a> SensorPacket<'a> {
     }
 
     pub fn fields(&self) -> FieldIter<'a, SensorField> {
-        FieldIter {
-            remaining: self.payload,
-            _marker: Default::default(),
-        }
+        FieldIter::new(self.payload)
     }
 }
 
@@ -59,7 +57,7 @@ pub enum SensorField {
 impl FieldParse for SensorField {
     const DESCRIPTOR_SET: u8 = SENSOR_DESCRIPTOR_SET;
 
-    fn parse(descriptor: u8, bytes: &[u8]) -> Result<Self, Error> {
+    fn parse(descriptor: u8, bytes: &[u8]) -> Result<Self, ParseError> {
         Ok(match descriptor {
             RawAccel::DESCRIPTOR => Self::RawAccel(RawAccel::from_bytes(bytes)?),
             RawGyro::DESCRIPTOR => Self::RawGyro(RawGyro::from_bytes(bytes)?),
@@ -112,7 +110,7 @@ pub struct RawAccel {
 impl RawAccel {
     pub const DESCRIPTOR: u8 = 0x01;
 
-    pub fn from_bytes(bytes: &[u8]) -> Result<Self, Error> {
+    pub fn from_bytes(bytes: &[u8]) -> Result<Self, ParseError> {
         let mut b = bytes;
         let raw_accel = Vector3f::read_from(&mut b, (SENSOR_DESCRIPTOR_SET, Self::DESCRIPTOR))?;
         Ok(Self { raw_accel })
@@ -127,7 +125,7 @@ pub struct RawGyro {
 impl RawGyro {
     pub const DESCRIPTOR: u8 = 0x02;
 
-    pub fn from_bytes(bytes: &[u8]) -> Result<Self, Error> {
+    pub fn from_bytes(bytes: &[u8]) -> Result<Self, ParseError> {
         let mut b = bytes;
         let raw_gyro = Vector3f::read_from(&mut b, (SENSOR_DESCRIPTOR_SET, Self::DESCRIPTOR))?;
         Ok(Self { raw_gyro })
@@ -142,7 +140,7 @@ pub struct RawMag {
 impl RawMag {
     pub const DESCRIPTOR: u8 = 0x03;
 
-    pub fn from_bytes(bytes: &[u8]) -> Result<Self, Error> {
+    pub fn from_bytes(bytes: &[u8]) -> Result<Self, ParseError> {
         let mut b = bytes;
         let raw_mag = Vector3f::read_from(&mut b, (SENSOR_DESCRIPTOR_SET, Self::DESCRIPTOR))?;
         Ok(Self { raw_mag })
@@ -157,7 +155,7 @@ pub struct ScaledAccel {
 impl ScaledAccel {
     pub const DESCRIPTOR: u8 = 0x04;
 
-    pub fn from_bytes(bytes: &[u8]) -> Result<Self, Error> {
+    pub fn from_bytes(bytes: &[u8]) -> Result<Self, ParseError> {
         let mut b = bytes;
         let scaled_accel = Vector3f::read_from(&mut b, (SENSOR_DESCRIPTOR_SET, Self::DESCRIPTOR))?;
         Ok(Self { scaled_accel })
@@ -172,7 +170,7 @@ pub struct ScaledGyro {
 impl ScaledGyro {
     pub const DESCRIPTOR: u8 = 0x05;
 
-    pub fn from_bytes(bytes: &[u8]) -> Result<Self, Error> {
+    pub fn from_bytes(bytes: &[u8]) -> Result<Self, ParseError> {
         let mut b = bytes;
         let scaled_gyro = Vector3f::read_from(&mut b, (SENSOR_DESCRIPTOR_SET, Self::DESCRIPTOR))?;
         Ok(Self { scaled_gyro })
@@ -187,7 +185,7 @@ pub struct ScaledMag {
 impl ScaledMag {
     pub const DESCRIPTOR: u8 = 0x06;
 
-    pub fn from_bytes(bytes: &[u8]) -> Result<Self, Error> {
+    pub fn from_bytes(bytes: &[u8]) -> Result<Self, ParseError> {
         let mut b = bytes;
         let scaled_mag = Vector3f::read_from(&mut b, (SENSOR_DESCRIPTOR_SET, Self::DESCRIPTOR))?;
         Ok(Self { scaled_mag })
@@ -202,7 +200,7 @@ pub struct DeltaTheta {
 impl DeltaTheta {
     pub const DESCRIPTOR: u8 = 0x07;
 
-    pub fn from_bytes(bytes: &[u8]) -> Result<Self, Error> {
+    pub fn from_bytes(bytes: &[u8]) -> Result<Self, ParseError> {
         let mut b = bytes;
         let delta_theta = Vector3f::read_from(&mut b, (SENSOR_DESCRIPTOR_SET, Self::DESCRIPTOR))?;
         Ok(Self { delta_theta })
@@ -217,7 +215,7 @@ pub struct DeltaVelocity {
 impl DeltaVelocity {
     pub const DESCRIPTOR: u8 = 0x08;
 
-    pub fn from_bytes(bytes: &[u8]) -> Result<Self, Error> {
+    pub fn from_bytes(bytes: &[u8]) -> Result<Self, ParseError> {
         let mut b = bytes;
         let delta_velocity =
             Vector3f::read_from(&mut b, (SENSOR_DESCRIPTOR_SET, Self::DESCRIPTOR))?;
@@ -233,7 +231,7 @@ pub struct CompOrientationMatrix {
 impl CompOrientationMatrix {
     pub const DESCRIPTOR: u8 = 0x09;
 
-    pub fn from_bytes(bytes: &[u8]) -> Result<Self, Error> {
+    pub fn from_bytes(bytes: &[u8]) -> Result<Self, ParseError> {
         let mut b = bytes;
         let m = Matrix3f::read_from(&mut b, (SENSOR_DESCRIPTOR_SET, Self::DESCRIPTOR))?;
         Ok(Self { m })
@@ -248,7 +246,7 @@ pub struct CompQuaternion {
 impl CompQuaternion {
     pub const DESCRIPTOR: u8 = 0x0A;
 
-    pub fn from_bytes(bytes: &[u8]) -> Result<Self, Error> {
+    pub fn from_bytes(bytes: &[u8]) -> Result<Self, ParseError> {
         let mut b = bytes;
         let q = Quatf::read_from(&mut b, (SENSOR_DESCRIPTOR_SET, Self::DESCRIPTOR))?;
         Ok(Self { q })
@@ -263,7 +261,7 @@ pub struct CompOrientationUpdateMatrix {
 impl CompOrientationUpdateMatrix {
     pub const DESCRIPTOR: u8 = 0x0B;
 
-    pub fn from_bytes(bytes: &[u8]) -> Result<Self, Error> {
+    pub fn from_bytes(bytes: &[u8]) -> Result<Self, ParseError> {
         let mut b = bytes;
         let m = Matrix3f::read_from(&mut b, (SENSOR_DESCRIPTOR_SET, Self::DESCRIPTOR))?;
         Ok(Self { m })
@@ -280,7 +278,7 @@ pub struct CompEulerAngles {
 impl CompEulerAngles {
     pub const DESCRIPTOR: u8 = 0x0C;
 
-    pub fn from_bytes(bytes: &[u8]) -> Result<Self, Error> {
+    pub fn from_bytes(bytes: &[u8]) -> Result<Self, ParseError> {
         let mut b = bytes;
         ensure_len(&b, 12, (SENSOR_DESCRIPTOR_SET, Self::DESCRIPTOR))?;
         let roll = b.read_f32();
@@ -298,7 +296,7 @@ pub struct OrientationRawTemp {
 impl OrientationRawTemp {
     pub const DESCRIPTOR: u8 = 0x0D;
 
-    pub fn from_bytes(bytes: &[u8]) -> Result<Self, Error> {
+    pub fn from_bytes(bytes: &[u8]) -> Result<Self, ParseError> {
         let mut b = bytes;
         ensure_len(&b, 8, (SENSOR_DESCRIPTOR_SET, Self::DESCRIPTOR))?;
         let raw_temp = [b.read_u16(), b.read_u16(), b.read_u16(), b.read_u16()];
@@ -314,7 +312,7 @@ pub struct InternalTimestamp {
 impl InternalTimestamp {
     pub const DESCRIPTOR: u8 = 0x0E;
 
-    pub fn from_bytes(bytes: &[u8]) -> Result<Self, Error> {
+    pub fn from_bytes(bytes: &[u8]) -> Result<Self, ParseError> {
         let mut b = bytes;
         ensure_len(&b, 4, (SENSOR_DESCRIPTOR_SET, Self::DESCRIPTOR))?;
         Ok(Self {
@@ -332,7 +330,7 @@ pub struct PpsTimestamp {
 impl PpsTimestamp {
     pub const DESCRIPTOR: u8 = 0x0F;
 
-    pub fn from_bytes(bytes: &[u8]) -> Result<Self, Error> {
+    pub fn from_bytes(bytes: &[u8]) -> Result<Self, ParseError> {
         let mut b = bytes;
         ensure_len(&b, 8, (SENSOR_DESCRIPTOR_SET, Self::DESCRIPTOR))?;
         let seconds = b.read_u32();
@@ -349,7 +347,7 @@ pub struct NorthVector {
 impl NorthVector {
     pub const DESCRIPTOR: u8 = 0x10;
 
-    pub fn from_bytes(bytes: &[u8]) -> Result<Self, Error> {
+    pub fn from_bytes(bytes: &[u8]) -> Result<Self, ParseError> {
         let mut b = bytes;
         let north = Vector3f::read_from(&mut b, (SENSOR_DESCRIPTOR_SET, Self::DESCRIPTOR))?;
         Ok(Self { north })
@@ -364,7 +362,7 @@ pub struct UpVector {
 impl UpVector {
     pub const DESCRIPTOR: u8 = 0x11;
 
-    pub fn from_bytes(bytes: &[u8]) -> Result<Self, Error> {
+    pub fn from_bytes(bytes: &[u8]) -> Result<Self, ParseError> {
         let mut b = bytes;
         let up = Vector3f::read_from(&mut b, (SENSOR_DESCRIPTOR_SET, Self::DESCRIPTOR))?;
         Ok(Self { up })
@@ -383,7 +381,7 @@ pub struct GpsTimestamp {
 impl GpsTimestamp {
     pub const DESCRIPTOR: u8 = 0x12;
 
-    pub fn from_bytes(bytes: &[u8]) -> Result<Self, Error> {
+    pub fn from_bytes(bytes: &[u8]) -> Result<Self, ParseError> {
         let mut b = bytes;
         // f64 + u16 + u16 = 12
         ensure_len(&b, 12, (SENSOR_DESCRIPTOR_SET, Self::DESCRIPTOR))?;
@@ -426,7 +424,7 @@ pub struct TemperatureAbs {
 impl TemperatureAbs {
     pub const DESCRIPTOR: u8 = 0x14;
 
-    pub fn from_bytes(bytes: &[u8]) -> Result<Self, Error> {
+    pub fn from_bytes(bytes: &[u8]) -> Result<Self, ParseError> {
         let mut b = bytes;
         ensure_len(&b, 12, (SENSOR_DESCRIPTOR_SET, Self::DESCRIPTOR))?;
         let min_temp = b.read_f32();
@@ -448,7 +446,7 @@ pub struct RawPressure {
 impl RawPressure {
     pub const DESCRIPTOR: u8 = 0x16;
 
-    pub fn from_bytes(bytes: &[u8]) -> Result<Self, Error> {
+    pub fn from_bytes(bytes: &[u8]) -> Result<Self, ParseError> {
         let mut b = bytes;
         ensure_len(&b, 4, (SENSOR_DESCRIPTOR_SET, Self::DESCRIPTOR))?;
         Ok(Self {
@@ -465,7 +463,7 @@ pub struct ScaledPressure {
 impl ScaledPressure {
     pub const DESCRIPTOR: u8 = 0x17;
 
-    pub fn from_bytes(bytes: &[u8]) -> Result<Self, Error> {
+    pub fn from_bytes(bytes: &[u8]) -> Result<Self, ParseError> {
         let mut b = bytes;
         ensure_len(&b, 4, (SENSOR_DESCRIPTOR_SET, Self::DESCRIPTOR))?;
         Ok(Self {
@@ -482,7 +480,7 @@ pub struct OverrangeStatus {
 impl OverrangeStatus {
     pub const DESCRIPTOR: u8 = 0x18;
 
-    pub fn from_bytes(bytes: &[u8]) -> Result<Self, Error> {
+    pub fn from_bytes(bytes: &[u8]) -> Result<Self, ParseError> {
         let mut b = bytes;
         ensure_len(&b, 2, (SENSOR_DESCRIPTOR_SET, Self::DESCRIPTOR))?;
         Ok(Self {
@@ -532,7 +530,7 @@ pub struct OdometerData {
 impl OdometerData {
     pub const DESCRIPTOR: u8 = 0x40;
 
-    pub fn from_bytes(bytes: &[u8]) -> Result<Self, Error> {
+    pub fn from_bytes(bytes: &[u8]) -> Result<Self, ParseError> {
         let mut b = bytes;
         ensure_len(&b, 10, (SENSOR_DESCRIPTOR_SET, Self::DESCRIPTOR))?;
         let speed = b.read_f32();
@@ -568,9 +566,9 @@ impl OdometerData {
 // impl ScaledAccel {
 //     const DESCRIPTOR: u8 = 0x04;
 
-//     pub fn from_bytes(bytes: &[u8]) -> Result<Self, Error> {
+//     pub fn from_bytes(bytes: &[u8]) -> Result<Self, FieldError> {
 //         if bytes.len() < 12 {
-//             return Err(Error::LenTooShort {
+//             return Err(FieldError::LenTooShort {
 //                 descriptor_set: SENSOR_DESCRIPTOR_SET,
 //                 descriptor: Self::DESCRIPTOR,
 //             });

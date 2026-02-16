@@ -1,18 +1,8 @@
 use thiserror::Error;
 
-use crate::serialize::OwnedMessage;
+use crate::{checksum::Checksum, errors::FrameError, serialize::OwnedMessage};
 
 const MAX_PAYLOAD: usize = 255;
-
-/// Error returned by Parser
-#[derive(Clone, Copy, Debug, Error, PartialEq, Eq)]
-pub enum ParseError {
-    #[error("A CRC mismatch occurred")]
-    CrcMismatch,
-    /// Thrown when expecting a SYNC value but got the wrong value
-    #[error("Unexpected byte")]
-    UnexpectedByte,
-}
 
 #[allow(clippy::len_without_is_empty)]
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -20,7 +10,11 @@ pub struct RawMessage<'a> {
     buf: &'a [u8],
 }
 
-impl RawMessage<'_> {
+impl<'a> RawMessage<'a> {
+    pub fn new(buf: &'a [u8]) -> Self {
+        Self { buf }
+    }
+
     pub fn payload(&self) -> &[u8] {
         &self.buf[2..2 + self.len() as usize]
     }
@@ -34,7 +28,7 @@ impl RawMessage<'_> {
     }
 
     pub fn to_owned(&self) -> OwnedMessage {
-        OwnedMessage::new(self.descriptor_set(), self.payload())
+        OwnedMessage::new_with_payload(self.descriptor_set(), self.payload())
     }
 }
 
@@ -143,7 +137,7 @@ impl MessageParser {
     /// descriptor_set byte on the next call to push_byte. However, in order to read pending
     /// messages immediately without receiving a new byte, one can call
     /// [`MessageParser::try_pending_message`].
-    pub fn push_byte(&mut self, b: u8) -> Result<Option<RawMessage<'_>>, ParseError> {
+    pub fn push_byte(&mut self, b: u8) -> Result<Option<RawMessage<'_>>, FrameError> {
         if self.pending_bytes.is_some() {
             if let Some(len) = self.consume_pending() {
                 // We found a message in the pending bytes.
@@ -178,7 +172,7 @@ impl MessageParser {
         buf: &mut [u8],
         pending_bytes: &mut Option<(usize, usize)>,
         b: u8,
-    ) -> Result<Option<usize>, ParseError> {
+    ) -> Result<Option<usize>, FrameError> {
         match state {
             ParseState::Sync1 => {
                 if b == Self::SYNC1 {
@@ -186,7 +180,7 @@ impl MessageParser {
                     Ok(None)
                 } else {
                     *state = ParseState::Sync1;
-                    Err(ParseError::UnexpectedByte)
+                    Err(FrameError::UnexpectedByte)
                 }
             }
             ParseState::Sync2 => {
@@ -195,7 +189,7 @@ impl MessageParser {
                     Ok(None)
                 } else {
                     *state = ParseState::Sync1;
-                    Err(ParseError::UnexpectedByte)
+                    Err(FrameError::UnexpectedByte)
                 }
             }
             ParseState::Descriptor => {
@@ -228,7 +222,7 @@ impl MessageParser {
             ParseState::CheckL => {
                 let payload_len = buf[1] as usize;
                 buf[payload_len + 3] = b;
-                let mut chk16 = fletcher::Fletcher16::new();
+                let mut chk16 = Checksum::new();
                 chk16.update(&[Self::SYNC1, Self::SYNC2]);
                 chk16.update(&buf[..payload_len + 2]);
 
@@ -241,7 +235,7 @@ impl MessageParser {
                     *state = ParseState::Sync1;
                     *pending_bytes = Some((0, payload_len + 4));
                     // Return the CRC error for now. Future bytes will be scanned on next call.
-                    Err(ParseError::CrcMismatch)
+                    Err(FrameError::CrcMismatch)
                 }
             }
         }
@@ -250,12 +244,12 @@ impl MessageParser {
 
 #[cfg(test)]
 mod tests {
-    use crate::parser::{MessageParser, ParseError};
+    use crate::framer::{FrameError, MessageParser};
 
     #[test]
     fn test_parse_message() {
         let count_payload: Vec<u8> = (0u8..32).collect();
-        let mut msg = crate::serialize::OwnedMessage::new(0x10, &count_payload);
+        let mut msg = crate::serialize::OwnedMessage::new_with_payload(0x10, &count_payload);
         let mut parser = MessageParser::new();
 
         let mut parsed = None;
@@ -277,9 +271,9 @@ mod tests {
     #[test]
     fn test_double_message_after_failure() {
         let count_payload: Vec<u8> = (0u8..255).collect();
-        let msg1 = crate::serialize::OwnedMessage::new(0x10, &count_payload[0..4]);
-        let msg2 = crate::serialize::OwnedMessage::new(0x20, &count_payload[0..8]);
-        let msg3 = crate::serialize::OwnedMessage::new(0x30, &count_payload);
+        let msg1 = crate::serialize::OwnedMessage::new_with_payload(0x10, &count_payload[0..4]);
+        let msg2 = crate::serialize::OwnedMessage::new_with_payload(0x20, &count_payload[0..8]);
+        let msg3 = crate::serialize::OwnedMessage::new_with_payload(0x30, &count_payload);
         let mut parser = MessageParser::new();
         // Intentially break the parser by making it expect as 128 byte message
         assert_eq!(Ok(None), parser.push_byte(0x75)); // SYNC1
@@ -300,8 +294,8 @@ mod tests {
                 }
                 Ok(None) => (),
                 Err(e) => match e {
-                    ParseError::CrcMismatch => crc_errors += 1,
-                    ParseError::UnexpectedByte => (),
+                    FrameError::CrcMismatch => crc_errors += 1,
+                    FrameError::UnexpectedByte => (),
                 },
             }
         }

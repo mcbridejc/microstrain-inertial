@@ -9,5 +9,10 @@ version = "0.0.1"
 edition = "2024"
 
 [dependencies]
-fletcher = "1.0.0"
+critical-section = "1.2.0"
 thiserror = "2.0.17"
+
+[dev-dependencies]
+clap = { version = "4.5.58", features = ["derive"] }
+critical-section = { version = "1.2.0", features = ["std"] }
+serialport = "4.8.1"

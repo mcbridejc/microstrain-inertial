@@ -1,6 +1,6 @@
 //! Shared descriptor set (0xFF) data fields.
 
-use super::{Error, ReadBuf};
+use super::{ParseError, ReadBuf};
 
 pub const SHARED_DESCRIPTOR_SET: u8 = 0xFF;
 
@@ -20,7 +20,7 @@ pub enum SharedField {
 
 impl SharedField {
     /// Parse a single Shared (0xFF) field given the *field descriptor* and its raw field payload bytes.
-    pub fn parse(descriptor: u8, bytes: &[u8]) -> Result<Self, Error> {
+    pub fn parse(descriptor: u8, bytes: &[u8]) -> Result<Self, ParseError> {
         match descriptor {
             EventSource::DESCRIPTOR => Ok(Self::EventSource(EventSource::from_bytes(bytes)?)),
             Ticks::DESCRIPTOR => Ok(Self::Ticks(Ticks::from_bytes(bytes)?)),
@@ -39,7 +39,7 @@ impl SharedField {
             ExternalTimeDelta::DESCRIPTOR => Ok(Self::ExternalTimeDelta(
                 ExternalTimeDelta::from_bytes(bytes)?,
             )),
-            other => Err(Error::UnknownField {
+            other => Err(ParseError::UnknownField {
                 descriptor_set: SHARED_DESCRIPTOR_SET,
                 descriptor: other,
             }),
@@ -60,7 +60,7 @@ impl EventSource {
     pub const DESCRIPTOR: u8 = 0xD0;
     pub const LEN: usize = 1;
 
-    pub fn from_bytes(bytes: &[u8]) -> Result<Self, Error> {
+    pub fn from_bytes(bytes: &[u8]) -> Result<Self, ParseError> {
         ensure_len(bytes, Self::DESCRIPTOR, Self::LEN)?;
         let mut b = bytes;
         Ok(Self {
@@ -78,7 +78,7 @@ impl Ticks {
     pub const DESCRIPTOR: u8 = 0xD1;
     pub const LEN: usize = 4;
 
-    pub fn from_bytes(bytes: &[u8]) -> Result<Self, Error> {
+    pub fn from_bytes(bytes: &[u8]) -> Result<Self, ParseError> {
         ensure_len(bytes, Self::DESCRIPTOR, Self::LEN)?;
         let mut b = bytes;
         Ok(Self {
@@ -96,7 +96,7 @@ impl DeltaTicks {
     pub const DESCRIPTOR: u8 = 0xD2;
     pub const LEN: usize = 4;
 
-    pub fn from_bytes(bytes: &[u8]) -> Result<Self, Error> {
+    pub fn from_bytes(bytes: &[u8]) -> Result<Self, ParseError> {
         ensure_len(bytes, Self::DESCRIPTOR, Self::LEN)?;
         let mut b = bytes;
         Ok(Self {
@@ -119,7 +119,7 @@ impl GpsTimestamp {
     pub const DESCRIPTOR: u8 = 0xD3;
     pub const LEN: usize = 8 + 2 + 2; // 12
 
-    pub fn from_bytes(bytes: &[u8]) -> Result<Self, Error> {
+    pub fn from_bytes(bytes: &[u8]) -> Result<Self, ParseError> {
         ensure_len(bytes, Self::DESCRIPTOR, Self::LEN)?;
         let mut b = bytes;
         Ok(Self {
@@ -158,7 +158,7 @@ impl DeltaTime {
     pub const DESCRIPTOR: u8 = 0xD4;
     pub const LEN: usize = 8;
 
-    pub fn from_bytes(bytes: &[u8]) -> Result<Self, Error> {
+    pub fn from_bytes(bytes: &[u8]) -> Result<Self, ParseError> {
         ensure_len(bytes, Self::DESCRIPTOR, Self::LEN)?;
         let mut b = bytes;
         Ok(Self { dt_s: b.read_f64() })
@@ -174,7 +174,7 @@ impl ReferenceTimestamp {
     pub const DESCRIPTOR: u8 = 0xD5;
     pub const LEN: usize = 8;
 
-    pub fn from_bytes(bytes: &[u8]) -> Result<Self, Error> {
+    pub fn from_bytes(bytes: &[u8]) -> Result<Self, ParseError> {
         ensure_len(bytes, Self::DESCRIPTOR, Self::LEN)?;
         let mut b = bytes;
         Ok(Self {
@@ -193,7 +193,7 @@ impl ReferenceTimeDelta {
     pub const DESCRIPTOR: u8 = 0xD6;
     pub const LEN: usize = 8;
 
-    pub fn from_bytes(bytes: &[u8]) -> Result<Self, Error> {
+    pub fn from_bytes(bytes: &[u8]) -> Result<Self, ParseError> {
         ensure_len(bytes, Self::DESCRIPTOR, Self::LEN)?;
         let mut b = bytes;
         Ok(Self { dt_s: b.read_f64() })
@@ -211,7 +211,7 @@ impl ExternalTimestamp {
     pub const DESCRIPTOR: u8 = 0xD7;
     pub const LEN: usize = 8 + 2; // 10
 
-    pub fn from_bytes(bytes: &[u8]) -> Result<Self, Error> {
+    pub fn from_bytes(bytes: &[u8]) -> Result<Self, ParseError> {
         ensure_len(bytes, Self::DESCRIPTOR, Self::LEN)?;
         let mut b = bytes;
         Ok(Self {
@@ -245,7 +245,7 @@ impl ExternalTimeDelta {
     pub const DESCRIPTOR: u8 = 0xD8;
     pub const LEN: usize = 8 + 2; // 10
 
-    pub fn from_bytes(bytes: &[u8]) -> Result<Self, Error> {
+    pub fn from_bytes(bytes: &[u8]) -> Result<Self, ParseError> {
         ensure_len(bytes, Self::DESCRIPTOR, Self::LEN)?;
         let mut b = bytes;
         Ok(Self {
@@ -273,9 +273,9 @@ impl ExternalTimeDeltaValidFlags {
 // -------------------------
 
 #[inline]
-fn ensure_len(buf: &[u8], descriptor: u8, need: usize) -> Result<(), Error> {
+fn ensure_len(buf: &[u8], descriptor: u8, need: usize) -> Result<(), ParseError> {
     if buf.len() < need {
-        return Err(Error::LenTooShort {
+        return Err(ParseError::LenTooShort {
             descriptor_set: SHARED_DESCRIPTOR_SET,
             descriptor,
             need,

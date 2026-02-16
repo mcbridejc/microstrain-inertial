@@ -1,11 +1,11 @@
 // src/mip/data/parse.rs
-use super::Error;
+use super::ParseError;
 use core::convert::TryInto;
 
 #[inline]
-pub fn need(bytes: &[u8], descriptor_set: u8, descriptor: u8, need: usize) -> Result<(), Error> {
+pub fn need(bytes: &[u8], descriptor_set: u8, descriptor: u8, need: usize) -> Result<(), ParseError> {
     if bytes.len() < need {
-        return Err(Error::LenTooShort {
+        return Err(ParseError::LenTooShort {
             descriptor_set,
             descriptor,
             need,

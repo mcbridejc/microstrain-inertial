@@ -1,10 +1,10 @@
 //! Filter descriptor set (0x82) data fields (full coverage).
 
-use crate::api::data::{
-    FieldIter, FieldParse, Matrix3f, Quatf, Vector3d, Vector3f, shared::SharedField,
+use crate::api::data::{Matrix3f, Quatf, Vector3d, Vector3f, shared::SharedField,
 };
-
-use super::{Error, ReadBuf, ensure_len};
+use crate::errors::ParseError;
+use crate::fields::{FieldParse, FieldIter};
+use super::{ReadBuf, ensure_len};
 
 pub const FILTER_DESCRIPTOR_SET: u8 = 0x82;
 
@@ -18,10 +18,7 @@ impl<'a> FilterPacket<'a> {
     }
 
     pub fn fields(&self) -> FieldIter<'a, FilterField> {
-        FieldIter {
-            remaining: self.payload,
-            _marker: Default::default(),
-        }
+        FieldIter::new(self.payload)
     }
 }
 
@@ -73,7 +70,7 @@ pub enum FilterField {
 impl FieldParse for FilterField {
     const DESCRIPTOR_SET: u8 = FILTER_DESCRIPTOR_SET;
 
-    fn parse(descriptor: u8, bytes: &[u8]) -> Result<Self, Error> {
+    fn parse(descriptor: u8, bytes: &[u8]) -> Result<Self, ParseError> {
         Ok(match descriptor {
             LlhPosition::DESCRIPTOR => Self::LlhPosition(LlhPosition::from_bytes(bytes)?),
             VelocityNed::DESCRIPTOR => Self::VelocityNed(VelocityNed::from_bytes(bytes)?),
@@ -233,7 +230,7 @@ impl LlhPosition {
     pub const DESCRIPTOR: u8 = 0x01;
     pub const LEN: usize = 8 + 8 + 8 + 2; // 26
 
-    pub fn from_bytes(bytes: &[u8]) -> Result<Self, Error> {
+    pub fn from_bytes(bytes: &[u8]) -> Result<Self, ParseError> {
         ensure_len(&bytes, Self::LEN, (FILTER_DESCRIPTOR_SET, Self::DESCRIPTOR))?;
         let mut b = bytes;
         Ok(Self {
@@ -257,7 +254,7 @@ impl VelocityNed {
     pub const DESCRIPTOR: u8 = 0x02;
     pub const LEN: usize = 4 + 4 + 4 + 2; // 14
 
-    pub fn from_bytes(bytes: &[u8]) -> Result<Self, Error> {
+    pub fn from_bytes(bytes: &[u8]) -> Result<Self, ParseError> {
         ensure_len(&bytes, Self::LEN, (FILTER_DESCRIPTOR_SET, Self::DESCRIPTOR))?;
         let mut b = bytes;
         Ok(Self {
@@ -279,7 +276,7 @@ impl AttitudeQuaternion {
     pub const DESCRIPTOR: u8 = 0x03;
     pub const LEN: usize = Quatf::LEN + 2; // 18
 
-    pub fn from_bytes(bytes: &[u8]) -> Result<Self, Error> {
+    pub fn from_bytes(bytes: &[u8]) -> Result<Self, ParseError> {
         ensure_len(&bytes, Self::LEN, (FILTER_DESCRIPTOR_SET, Self::DESCRIPTOR))?;
         let mut b = bytes;
         Ok(Self {
@@ -299,7 +296,7 @@ impl AttitudeDcm {
     pub const DESCRIPTOR: u8 = 0x04;
     pub const LEN: usize = Matrix3f::LEN + 2; // 38
 
-    pub fn from_bytes(bytes: &[u8]) -> Result<Self, Error> {
+    pub fn from_bytes(bytes: &[u8]) -> Result<Self, ParseError> {
         ensure_len(&bytes, Self::LEN, (FILTER_DESCRIPTOR_SET, Self::DESCRIPTOR))?;
         let mut b = bytes;
         Ok(Self {
@@ -321,7 +318,7 @@ impl EulerAngles {
     pub const DESCRIPTOR: u8 = 0x05;
     pub const LEN: usize = 4 + 4 + 4 + 2; // 14
 
-    pub fn from_bytes(bytes: &[u8]) -> Result<Self, Error> {
+    pub fn from_bytes(bytes: &[u8]) -> Result<Self, ParseError> {
         ensure_len(&bytes, Self::LEN, (FILTER_DESCRIPTOR_SET, Self::DESCRIPTOR))?;
         let mut b = bytes;
         Ok(Self {
@@ -343,7 +340,7 @@ impl GyroBias {
     pub const DESCRIPTOR: u8 = 0x06;
     pub const LEN: usize = Vector3f::LEN + 2; // 14
 
-    pub fn from_bytes(bytes: &[u8]) -> Result<Self, Error> {
+    pub fn from_bytes(bytes: &[u8]) -> Result<Self, ParseError> {
         ensure_len(&bytes, Self::LEN, (FILTER_DESCRIPTOR_SET, Self::DESCRIPTOR))?;
         let mut b = bytes;
         Ok(Self {
@@ -363,7 +360,7 @@ impl AccelBias {
     pub const DESCRIPTOR: u8 = 0x07;
     pub const LEN: usize = Vector3f::LEN + 2; // 14
 
-    pub fn from_bytes(bytes: &[u8]) -> Result<Self, Error> {
+    pub fn from_bytes(bytes: &[u8]) -> Result<Self, ParseError> {
         ensure_len(&bytes, Self::LEN, (FILTER_DESCRIPTOR_SET, Self::DESCRIPTOR))?;
         let mut b = bytes;
         Ok(Self {
@@ -385,7 +382,7 @@ impl LlhPositionUncertainty {
     pub const DESCRIPTOR: u8 = 0x08;
     pub const LEN: usize = 4 + 4 + 4 + 2; // 14
 
-    pub fn from_bytes(bytes: &[u8]) -> Result<Self, Error> {
+    pub fn from_bytes(bytes: &[u8]) -> Result<Self, ParseError> {
         ensure_len(&bytes, Self::LEN, (FILTER_DESCRIPTOR_SET, Self::DESCRIPTOR))?;
         let mut b = bytes;
         Ok(Self {
@@ -409,7 +406,7 @@ impl NedVelocityUncertainty {
     pub const DESCRIPTOR: u8 = 0x09;
     pub const LEN: usize = 4 + 4 + 4 + 2; // 14
 
-    pub fn from_bytes(bytes: &[u8]) -> Result<Self, Error> {
+    pub fn from_bytes(bytes: &[u8]) -> Result<Self, ParseError> {
         ensure_len(&bytes, Self::LEN, (FILTER_DESCRIPTOR_SET, Self::DESCRIPTOR))?;
         let mut b = bytes;
         Ok(Self {
@@ -433,7 +430,7 @@ impl EulerAnglesUncertainty {
     pub const DESCRIPTOR: u8 = 0x0A;
     pub const LEN: usize = 4 + 4 + 4 + 2; // 14
 
-    pub fn from_bytes(bytes: &[u8]) -> Result<Self, Error> {
+    pub fn from_bytes(bytes: &[u8]) -> Result<Self, ParseError> {
         ensure_len(&bytes, Self::LEN, (FILTER_DESCRIPTOR_SET, Self::DESCRIPTOR))?;
         let mut b = bytes;
         Ok(Self {
@@ -455,7 +452,7 @@ impl GyroBiasUncertainty {
     pub const DESCRIPTOR: u8 = 0x0B;
     pub const LEN: usize = Vector3f::LEN + 2; // 14
 
-    pub fn from_bytes(bytes: &[u8]) -> Result<Self, Error> {
+    pub fn from_bytes(bytes: &[u8]) -> Result<Self, ParseError> {
         ensure_len(&bytes, Self::LEN, (FILTER_DESCRIPTOR_SET, Self::DESCRIPTOR))?;
         let mut b = bytes;
         Ok(Self {
@@ -478,7 +475,7 @@ impl AccelBiasUncertainty {
     pub const DESCRIPTOR: u8 = 0x0C;
     pub const LEN: usize = Vector3f::LEN + 2; // 14
 
-    pub fn from_bytes(bytes: &[u8]) -> Result<Self, Error> {
+    pub fn from_bytes(bytes: &[u8]) -> Result<Self, ParseError> {
         ensure_len(&bytes, Self::LEN, (FILTER_DESCRIPTOR_SET, Self::DESCRIPTOR))?;
         let mut b = bytes;
         Ok(Self {
@@ -501,7 +498,7 @@ impl LinearAccel {
     pub const DESCRIPTOR: u8 = 0x0D;
     pub const LEN: usize = Vector3f::LEN + 2; // 14
 
-    pub fn from_bytes(bytes: &[u8]) -> Result<Self, Error> {
+    pub fn from_bytes(bytes: &[u8]) -> Result<Self, ParseError> {
         ensure_len(&bytes, Self::LEN, (FILTER_DESCRIPTOR_SET, Self::DESCRIPTOR))?;
         let mut b = bytes;
         Ok(Self {
@@ -521,7 +518,7 @@ impl CompAngularRate {
     pub const DESCRIPTOR: u8 = 0x0E;
     pub const LEN: usize = Vector3f::LEN + 2; // 14
 
-    pub fn from_bytes(bytes: &[u8]) -> Result<Self, Error> {
+    pub fn from_bytes(bytes: &[u8]) -> Result<Self, ParseError> {
         ensure_len(&bytes, Self::LEN, (FILTER_DESCRIPTOR_SET, Self::DESCRIPTOR))?;
         let mut b = bytes;
         Ok(Self {
@@ -542,7 +539,7 @@ impl Status {
     pub const DESCRIPTOR: u8 = 0x10;
     pub const LEN: usize = 2 + 2 + 2; // 6
 
-    pub fn from_bytes(bytes: &[u8]) -> Result<Self, Error> {
+    pub fn from_bytes(bytes: &[u8]) -> Result<Self, ParseError> {
         ensure_len(&bytes, Self::LEN, (FILTER_DESCRIPTOR_SET, Self::DESCRIPTOR))?;
         let mut b = bytes;
         Ok(Self {
@@ -564,7 +561,7 @@ impl Timestamp {
     pub const DESCRIPTOR: u8 = 0x11;
     pub const LEN: usize = 8 + 2 + 2; // 12
 
-    pub fn from_bytes(bytes: &[u8]) -> Result<Self, Error> {
+    pub fn from_bytes(bytes: &[u8]) -> Result<Self, ParseError> {
         ensure_len(&bytes, Self::LEN, (FILTER_DESCRIPTOR_SET, Self::DESCRIPTOR))?;
         let mut b = bytes;
         Ok(Self {
@@ -585,7 +582,7 @@ impl QuaternionAttitudeUncertainty {
     pub const DESCRIPTOR: u8 = 0x12;
     pub const LEN: usize = Quatf::LEN + 2; // 18
 
-    pub fn from_bytes(bytes: &[u8]) -> Result<Self, Error> {
+    pub fn from_bytes(bytes: &[u8]) -> Result<Self, ParseError> {
         ensure_len(&bytes, Self::LEN, (FILTER_DESCRIPTOR_SET, Self::DESCRIPTOR))?;
         let mut b = bytes;
         Ok(Self {
@@ -605,7 +602,7 @@ impl GravityVector {
     pub const DESCRIPTOR: u8 = 0x13;
     pub const LEN: usize = Vector3f::LEN + 2; // 14
 
-    pub fn from_bytes(bytes: &[u8]) -> Result<Self, Error> {
+    pub fn from_bytes(bytes: &[u8]) -> Result<Self, ParseError> {
         ensure_len(&bytes, Self::LEN, (FILTER_DESCRIPTOR_SET, Self::DESCRIPTOR))?;
         let mut b = bytes;
         Ok(Self {
@@ -629,7 +626,7 @@ impl MagneticModel {
     pub const DESCRIPTOR: u8 = 0x15;
     pub const LEN: usize = 4 * 5 + 2; // 22
 
-    pub fn from_bytes(bytes: &[u8]) -> Result<Self, Error> {
+    pub fn from_bytes(bytes: &[u8]) -> Result<Self, ParseError> {
         ensure_len(&bytes, Self::LEN, (FILTER_DESCRIPTOR_SET, Self::DESCRIPTOR))?;
         let mut b = bytes;
         Ok(Self {
@@ -653,7 +650,7 @@ impl CompensatedAcceleration {
     pub const DESCRIPTOR: u8 = 0x1C;
     pub const LEN: usize = Vector3f::LEN + 2; // 14
 
-    pub fn from_bytes(bytes: &[u8]) -> Result<Self, Error> {
+    pub fn from_bytes(bytes: &[u8]) -> Result<Self, ParseError> {
         ensure_len(&bytes, Self::LEN, (FILTER_DESCRIPTOR_SET, Self::DESCRIPTOR))?;
         let mut b = bytes;
         Ok(Self {
@@ -673,7 +670,7 @@ impl PressureAltitude {
     pub const DESCRIPTOR: u8 = 0x21;
     pub const LEN: usize = 4 + 2; // 6
 
-    pub fn from_bytes(bytes: &[u8]) -> Result<Self, Error> {
+    pub fn from_bytes(bytes: &[u8]) -> Result<Self, ParseError> {
         ensure_len(&bytes, Self::LEN, (FILTER_DESCRIPTOR_SET, Self::DESCRIPTOR))?;
         let mut b = bytes;
         Ok(Self {
@@ -694,7 +691,7 @@ impl MultiAntennaOffsetCorrection {
     pub const DESCRIPTOR: u8 = 0x34;
     pub const LEN: usize = 1 + Vector3f::LEN + 2; // 15
 
-    pub fn from_bytes(bytes: &[u8]) -> Result<Self, Error> {
+    pub fn from_bytes(bytes: &[u8]) -> Result<Self, ParseError> {
         ensure_len(&bytes, Self::LEN, (FILTER_DESCRIPTOR_SET, Self::DESCRIPTOR))?;
         let mut b = bytes;
         Ok(Self {
@@ -716,7 +713,7 @@ impl MultiAntennaOffsetCorrectionUncertainty {
     pub const DESCRIPTOR: u8 = 0x35;
     pub const LEN: usize = 1 + Vector3f::LEN + 2; // 15
 
-    pub fn from_bytes(bytes: &[u8]) -> Result<Self, Error> {
+    pub fn from_bytes(bytes: &[u8]) -> Result<Self, ParseError> {
         ensure_len(&bytes, Self::LEN, (FILTER_DESCRIPTOR_SET, Self::DESCRIPTOR))?;
         let mut b = bytes;
         Ok(Self {
@@ -740,7 +737,7 @@ impl EcefPositionUncertainty {
     pub const DESCRIPTOR: u8 = 0x36;
     pub const LEN: usize = Vector3f::LEN + 2; // 14
 
-    pub fn from_bytes(bytes: &[u8]) -> Result<Self, Error> {
+    pub fn from_bytes(bytes: &[u8]) -> Result<Self, ParseError> {
         ensure_len(&bytes, Self::LEN, (FILTER_DESCRIPTOR_SET, Self::DESCRIPTOR))?;
         let mut b = bytes;
         Ok(Self {
@@ -760,7 +757,7 @@ impl EcefVelocityUncertainty {
     pub const DESCRIPTOR: u8 = 0x37;
     pub const LEN: usize = Vector3f::LEN + 2; // 14
 
-    pub fn from_bytes(bytes: &[u8]) -> Result<Self, Error> {
+    pub fn from_bytes(bytes: &[u8]) -> Result<Self, ParseError> {
         ensure_len(&bytes, Self::LEN, (FILTER_DESCRIPTOR_SET, Self::DESCRIPTOR))?;
         let mut b = bytes;
         Ok(Self {
@@ -780,7 +777,7 @@ impl EcefPosition {
     pub const DESCRIPTOR: u8 = 0x40;
     pub const LEN: usize = Vector3d::LEN + 2; // 26
 
-    pub fn from_bytes(bytes: &[u8]) -> Result<Self, Error> {
+    pub fn from_bytes(bytes: &[u8]) -> Result<Self, ParseError> {
         ensure_len(&bytes, Self::LEN, (FILTER_DESCRIPTOR_SET, Self::DESCRIPTOR))?;
         let mut b = bytes;
         Ok(Self {
@@ -803,7 +800,7 @@ impl EcefVelocity {
     pub const DESCRIPTOR: u8 = 0x41;
     pub const LEN: usize = Vector3f::LEN + 2; // 14
 
-    pub fn from_bytes(bytes: &[u8]) -> Result<Self, Error> {
+    pub fn from_bytes(bytes: &[u8]) -> Result<Self, ParseError> {
         ensure_len(&bytes, Self::LEN, (FILTER_DESCRIPTOR_SET, Self::DESCRIPTOR))?;
         let mut b = bytes;
         Ok(Self {
@@ -826,7 +823,7 @@ impl NedRelativePosition {
     pub const DESCRIPTOR: u8 = 0x42;
     pub const LEN: usize = Vector3d::LEN + 2; // 26
 
-    pub fn from_bytes(bytes: &[u8]) -> Result<Self, Error> {
+    pub fn from_bytes(bytes: &[u8]) -> Result<Self, ParseError> {
         ensure_len(&bytes, Self::LEN, (FILTER_DESCRIPTOR_SET, Self::DESCRIPTOR))?;
         let mut b = bytes;
         Ok(Self {
@@ -851,7 +848,7 @@ impl GnssPositionAidingStatus {
     pub const DESCRIPTOR: u8 = 0x43;
     pub const LEN: usize = 1 + 4 + 2 + 8; // 15
 
-    pub fn from_bytes(bytes: &[u8]) -> Result<Self, Error> {
+    pub fn from_bytes(bytes: &[u8]) -> Result<Self, ParseError> {
         ensure_len(&bytes, Self::LEN, (FILTER_DESCRIPTOR_SET, Self::DESCRIPTOR))?;
         let mut b = bytes;
         Ok(Self {
@@ -875,7 +872,7 @@ impl AidingMeasurementSummary {
     pub const DESCRIPTOR: u8 = 0x46;
     pub const LEN: usize = 4 + 1 + 1 + 1; // 7
 
-    pub fn from_bytes(bytes: &[u8]) -> Result<Self, Error> {
+    pub fn from_bytes(bytes: &[u8]) -> Result<Self, ParseError> {
         ensure_len(&bytes, Self::LEN, (FILTER_DESCRIPTOR_SET, Self::DESCRIPTOR))?;
         let mut b = bytes;
         Ok(Self {
@@ -897,7 +894,7 @@ impl OdometerScaleFactorError {
     pub const DESCRIPTOR: u8 = 0x47;
     pub const LEN: usize = 4 + 2; // 6
 
-    pub fn from_bytes(bytes: &[u8]) -> Result<Self, Error> {
+    pub fn from_bytes(bytes: &[u8]) -> Result<Self, ParseError> {
         ensure_len(&bytes, Self::LEN, (FILTER_DESCRIPTOR_SET, Self::DESCRIPTOR))?;
         let mut b = bytes;
         Ok(Self {
@@ -917,7 +914,7 @@ impl OdometerScaleFactorErrorUncertainty {
     pub const DESCRIPTOR: u8 = 0x48;
     pub const LEN: usize = 4 + 2; // 6
 
-    pub fn from_bytes(bytes: &[u8]) -> Result<Self, Error> {
+    pub fn from_bytes(bytes: &[u8]) -> Result<Self, ParseError> {
         ensure_len(&bytes, Self::LEN, (FILTER_DESCRIPTOR_SET, Self::DESCRIPTOR))?;
         let mut b = bytes;
         Ok(Self {
@@ -941,7 +938,7 @@ impl GnssDualAntennaStatus {
     pub const DESCRIPTOR: u8 = 0x49;
     pub const LEN: usize = 4 + 4 + 4 + 1 + 2 + 2; // 17
 
-    pub fn from_bytes(bytes: &[u8]) -> Result<Self, Error> {
+    pub fn from_bytes(bytes: &[u8]) -> Result<Self, ParseError> {
         ensure_len(&bytes, Self::LEN, (FILTER_DESCRIPTOR_SET, Self::DESCRIPTOR))?;
         let mut b = bytes;
         Ok(Self {
@@ -966,7 +963,7 @@ impl AidingFrameConfigurationError {
     pub const DESCRIPTOR: u8 = 0x50;
     pub const LEN: usize = 1 + Vector3f::LEN + Quatf::LEN; // 29
 
-    pub fn from_bytes(bytes: &[u8]) -> Result<Self, Error> {
+    pub fn from_bytes(bytes: &[u8]) -> Result<Self, ParseError> {
         ensure_len(&bytes, Self::LEN, (FILTER_DESCRIPTOR_SET, Self::DESCRIPTOR))?;
         let mut b = bytes;
         Ok(Self {
@@ -988,7 +985,7 @@ impl AidingFrameConfigurationErrorUncertainty {
     pub const DESCRIPTOR: u8 = 0x51;
     pub const LEN: usize = 1 + Vector3f::LEN + Vector3f::LEN; // 25
 
-    pub fn from_bytes(bytes: &[u8]) -> Result<Self, Error> {
+    pub fn from_bytes(bytes: &[u8]) -> Result<Self, ParseError> {
         ensure_len(&bytes, Self::LEN, (FILTER_DESCRIPTOR_SET, Self::DESCRIPTOR))?;
         let mut b = bytes;
         Ok(Self {

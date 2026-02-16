@@ -1,7 +1,7 @@
-use crate::api::{
-    Error,
-    data::{ReadBuf as _, ensure_len},
-};
+//! Complex MIP data types
+
+use crate::api::data::{ensure_len, ReadBuf as _};
+use crate::errors::ParseError;
 
 #[derive(Debug, Copy, Clone, PartialEq)]
 pub struct Vector3f {
@@ -26,7 +26,7 @@ impl Vector3f {
     }
 
     #[inline]
-    pub fn read_from(buf: &mut &[u8], descriptor: (u8, u8)) -> Result<Self, Error> {
+    pub fn read_from(buf: &mut &[u8], descriptor: (u8, u8)) -> Result<Self, ParseError> {
         ensure_len(buf, Self::LEN, descriptor)?;
         Ok(Self {
             x: buf.read_f32(),
@@ -59,7 +59,7 @@ impl Vector3d {
     }
 
     #[inline]
-    pub fn read_from(buf: &mut &[u8], descriptor: (u8, u8)) -> Result<Self, Error> {
+    pub fn read_from(buf: &mut &[u8], descriptor: (u8, u8)) -> Result<Self, ParseError> {
         ensure_len(buf, Self::LEN, descriptor)?;
         Ok(Self {
             x: buf.read_f64(),
@@ -84,7 +84,7 @@ impl Matrix3f {
     }
 
     #[inline]
-    pub fn read_from(buf: &mut &[u8], descriptor: (u8, u8)) -> Result<Self, Error> {
+    pub fn read_from(buf: &mut &[u8], descriptor: (u8, u8)) -> Result<Self, ParseError> {
         ensure_len(buf, 36, descriptor)?;
         let mut data = [0.0f32; 9];
         for v in &mut data {
@@ -120,7 +120,7 @@ impl Quatf {
     }
 
     #[inline]
-    pub fn read_from(buf: &mut &[u8], descriptor: (u8, u8)) -> Result<Self, Error> {
+    pub fn read_from(buf: &mut &[u8], descriptor: (u8, u8)) -> Result<Self, ParseError> {
         ensure_len(buf, 16, descriptor)?;
         Ok(Self {
             w: buf.read_f32(),
