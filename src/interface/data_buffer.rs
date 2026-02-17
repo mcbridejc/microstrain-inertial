@@ -43,8 +43,8 @@ impl<const N: usize> DataBuffer<N> {
         let mut grant = prod
             .grant_exact(packet_len)
             .map_err(|_| DataBufferError::InsufficientSpace)?;
-        grant[0] = payload.len() as u8;
-        grant[1] = descriptor_set;
+        grant[0] = descriptor_set;
+        grant[1] = payload.len() as u8;
         grant[2..packet_len].copy_from_slice(payload);
         grant.commit(packet_len);
         Ok(())
@@ -123,7 +123,7 @@ fn is_valid_raw_packet(packet: &[u8]) -> bool {
     if packet.len() < 2 {
         return false;
     }
-    let payload_len = packet[0] as usize;
+    let payload_len = packet[1] as usize;
     if payload_len + 2 != packet.len() {
         return false;
     }
@@ -149,11 +149,8 @@ fn packet_len(src: &[u8]) -> Option<usize> {
     if src.len() < 2 {
         return None;
     }
-    let payload_len = src[0] as usize;
+    let payload_len = src[1] as usize;
     let packet_len = payload_len + 2;
-    if packet_len < 2 {
-        return None;
-    }
     Some(packet_len)
 }
 
@@ -195,16 +192,16 @@ mod tests {
         db.push_packet(0x80, &[2, 0x04, 0xAA, 0xBB]).unwrap();
 
         let packet = db.read_packet().unwrap();
-        assert_eq!(packet.as_slice(), &[4, 0x80, 2, 0x04, 0xAA, 0xBB]);
+        assert_eq!(packet.as_slice(), &[0x80, 4, 2, 0x04, 0xAA, 0xBB]);
     }
 
     #[test]
     fn packet_available_does_not_consume() {
         let db = DataBuffer::<64>::new();
-        db.push_raw_packet(&[4, 0x80, 2, 0x01, 0xAA, 0xBB]).unwrap();
+        db.push_raw_packet(&[0x80, 4, 2, 0x01, 0xAA, 0xBB]).unwrap();
         assert!(db.is_packet_available());
         let packet = db.read_packet().unwrap();
-        assert_eq!(packet.as_slice(), &[4, 0x80, 2, 0x01, 0xAA, 0xBB]);
+        assert_eq!(packet.as_slice(), &[0x80, 4, 2, 0x01, 0xAA, 0xBB]);
         drop(packet);
         assert!(!db.is_packet_available());
     }
@@ -212,14 +209,14 @@ mod tests {
     #[test]
     fn read_packet_is_one_packet_only() {
         let db = DataBuffer::<64>::new();
-        db.push_raw_packet(&[3, 0x80, 1, 0x01, 0x11]).unwrap();
-        db.push_raw_packet(&[3, 0x81, 1, 0x02, 0x22]).unwrap();
+        db.push_raw_packet(&[0x80, 3, 1, 0x01, 0x11]).unwrap();
+        db.push_raw_packet(&[0x81, 3, 1, 0x02, 0x22]).unwrap();
 
         let p1 = db.read_packet().unwrap();
-        assert_eq!(p1.as_slice(), &[3, 0x80, 1, 0x01, 0x11]);
+        assert_eq!(p1.as_slice(), &[0x80, 3, 1, 0x01, 0x11]);
         drop(p1);
 
         let p2 = db.read_packet().unwrap();
-        assert_eq!(p2.as_slice(), &[3, 0x81, 1, 0x02, 0x22]);
+        assert_eq!(p2.as_slice(), &[0x81, 3, 1, 0x02, 0x22]);
     }
 }

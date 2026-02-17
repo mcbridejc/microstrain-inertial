@@ -56,7 +56,7 @@ fn test_read_raw_data() {
         panic!("expected ready")
     };
     let packet = result.expect("unexpected data read error");
-    assert_eq!(packet.as_slice(), &[4, 0x80, 2, 0x04, 0xAA, 0xBB]);
+    assert_eq!(packet.as_slice(), &[0x80, 4, 2, 0x04, 0xAA, 0xBB]);
     drop(packet);
     assert!(!interface.is_data_available());
 }
