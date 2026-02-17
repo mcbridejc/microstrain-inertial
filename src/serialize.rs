@@ -1,6 +1,5 @@
 use crate::{
-    CRC_SIZE, HEADER_SIZE, MAX_PACKET_SIZE, MAX_PAYLOAD_SIZE, SYNC1, SYNC2,
-    checksum::{self, Checksum},
+    CRC_SIZE, HEADER_SIZE, MAX_PACKET_SIZE, MAX_PAYLOAD_SIZE, SYNC1, SYNC2, checksum::Checksum,
 };
 
 #[derive(Clone, Copy, Debug)]

@@ -40,6 +40,10 @@ pub fn start_serialport_thread<const DATA_BUFFER_SIZE: usize>(
         .spawn(move || {
             let mut read_buf = [0; 256];
             let mut framer = MessageFramer::new();
+
+            // Attempt to clear OS buffers before starting
+            port.discard_input_buffer().ok();
+
             loop {
                 let result = port.read(&mut read_buf);
                 if result.is_err() {

@@ -9,7 +9,7 @@ use thiserror::Error;
 
 use crate::MAX_PACKET_SIZE;
 use crate::api::commands::base::Ping;
-use crate::api::commands::imu_3dm::{DescriptorRate, MessageFormat};
+use crate::api::commands::imu_3dm::{DescriptorRate, MessageFormat, MessageFormatResponse};
 use crate::api::commands::{
     AckNack, CommandField, CommandResponse, CommandResponseData, CommandResponseIter,
     CommandSerialize, SerializeError,
@@ -278,23 +278,21 @@ impl<const DATA_BUFFER_SIZE: usize> AsyncInterface<DATA_BUFFER_SIZE> {
         self.send_command_field(&Ping {})
     }
 
-    pub async fn set_message_format(
+    pub fn set_message_format(
         &self,
         descriptor_set: u8,
         descriptors: &[DescriptorRate],
-    ) -> Result<(), CommandSendError> {
+    ) -> CommandResponseFuture<'_, (), DATA_BUFFER_SIZE> {
         let cmd = MessageFormat::Write {
             descriptor_set,
             descriptors,
         };
-
-        let resp = self.send_command_field(&cmd).await?;
-
-        if !resp.acknack.is_ack() {
-            Err(CommandSendError::Nack(resp.acknack))
-        } else {
-            Ok(())
-        }
+        let commands: &[&dyn CommandField<Response = MessageFormatResponse>] = &[&cmd];
+        critical_section::with(|cs| {
+            let mut state = self.state.borrow_ref_mut(cs);
+            state.queue_command(&commands);
+        });
+        CommandResponseFuture::new(self)
     }
 
     pub fn read_outgoing_bytes(&self, buf: &mut [u8]) -> usize {
