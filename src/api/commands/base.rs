@@ -1,4 +1,4 @@
-//! Base commands
+//! Base (0x01) commands
 //!
 
 use super::{BASE_DESCRIPTOR_SET, CommandField};

@@ -1,13 +1,12 @@
+//! Type definitions for interpreting data packets
 pub mod filter;
-pub mod parse;
 pub mod sensor;
 pub mod shared;
-mod types;
 
 pub use crate::errors::ParseError;
-pub use parse::ReadBuf;
+pub use crate::api::parse::ReadBuf;
 
-pub use types::*;
+pub use crate::api::types::*;
 
 /// helper function for validating length
 #[inline]

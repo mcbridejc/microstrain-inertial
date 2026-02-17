@@ -253,7 +253,7 @@ impl CompQuaternion {
     }
 }
 
-/// (0x80, 0x0B) Comp Orientation Update Matrix (deprecated) - float[9]
+/// (0x80, 0x0B) Comp Orientation Update Matrix (deprecated)
 #[derive(Debug, Copy, Clone, PartialEq)]
 pub struct CompOrientationUpdateMatrix {
     pub m: Matrix3f,
@@ -288,7 +288,7 @@ impl CompEulerAngles {
     }
 }
 
-/// (0x80, 0x0D) Orientation Raw Temp (deprecated) - u16[4]
+/// (0x80, 0x0D) Orientation Raw Temp (deprecated)
 #[derive(Debug, Copy, Clone, PartialEq)]
 pub struct OrientationRawTemp {
     pub raw_temp: [u16; 4],
@@ -372,9 +372,9 @@ impl UpVector {
 /// (0x80, 0x12) GPS Timestamp
 #[derive(Debug, Copy, Clone, PartialEq)]
 pub struct GpsTimestamp {
-    /// GPS time-of-week [seconds]
+    /// GPS time-of-week (seconds)
     pub tow: f64,
-    /// GPS week number since 1980 [weeks]
+    /// GPS week number since 1980 (weeks)
     pub week_number: u16,
     pub valid_flags: GpsTimestampValidFlags,
 }

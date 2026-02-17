@@ -1,6 +1,6 @@
 //! 3DM (0x0C) commands.
 
-use crate::api::data::{Matrix3f, Quatf, Vector3f};
+use crate::api::types::{Matrix3f, Quatf, Vector3f};
 use crate::errors::ParseError;
 
 use super::base::FunctionSelector;

@@ -1,5 +1,4 @@
-// src/mip/data/parse.rs
-use super::ParseError;
+use crate::errors::ParseError;
 use core::convert::TryInto;
 
 #[inline]
@@ -121,22 +120,5 @@ impl ReadBuf for &[u8] {
         let v: [u8; N] = self[..N].try_into().unwrap();
         *self = &self[N..];
         v
-    }
-}
-
-#[derive(Debug, Clone)]
-pub struct RawPayload<'a> {
-    pub descriptor_set: u8,
-    pub descriptor: u8,
-    pub payload: &'a [u8],
-}
-
-impl<'a> RawPayload<'a> {
-    pub fn new(descriptor_set: u8, descriptor: u8, payload: &'a [u8]) -> Self {
-        Self {
-            descriptor_set,
-            descriptor,
-            payload,
-        }
     }
 }

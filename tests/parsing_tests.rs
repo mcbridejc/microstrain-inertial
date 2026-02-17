@@ -1,6 +1,6 @@
 use microstrain_inertial::{
     api::{
-        DataPacket, Packet,
+        DataPacket,
         data::{
             Quatf, Vector3f,
             filter::{
@@ -163,12 +163,9 @@ fn test_parsing_multiple_sensor_fields() {
     assert_eq!(1, parsed.len());
 
     let sensor_packet =
-        match Packet::from_frame(parsed[0].descriptor_set(), parsed[0].payload()).unwrap() {
-            Packet::Command(_) => panic!("Command packet!"),
-            Packet::Data(data_packet) => match data_packet {
-                DataPacket::SensorPacket(p) => p,
-                _ => panic!("wrong data packet"),
-            },
+        match DataPacket::from_frame(parsed[0].descriptor_set(), parsed[0].payload()).unwrap() {
+            DataPacket::SensorPacket(p) => p,
+            _ => panic!("wrong data packet"),
         };
 
     let fields: Result<Vec<SensorField>, _> = sensor_packet.fields().collect();
@@ -219,12 +216,9 @@ fn test_parsing_multiple_filter_fields() {
     assert_eq!(1, parsed.len());
 
     let filter_packet =
-        match Packet::from_frame(parsed[0].descriptor_set(), parsed[0].payload()).unwrap() {
-            Packet::Command(_) => panic!("Command packet!"),
-            Packet::Data(data_packet) => match data_packet {
-                DataPacket::FilterPacket(p) => p,
-                _ => panic!("wrong data packet"),
-            },
+        match DataPacket::from_frame(parsed[0].descriptor_set(), parsed[0].payload()).unwrap() {
+            DataPacket::FilterPacket(p) => p,
+            _ => panic!("wrong data packet"),
         };
 
     let fields: Result<Vec<FilterField>, _> = filter_packet.fields().collect();

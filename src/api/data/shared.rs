@@ -108,9 +108,9 @@ impl DeltaTicks {
 /// (0xFF, 0xD3) GPS Timestamp
 #[derive(Debug, Copy, Clone, PartialEq)]
 pub struct GpsTimestamp {
-    /// GPS Time of Week [seconds]
+    /// GPS Time of Week (seconds)
     pub tow_s: f64,
-    /// GPS Week Number [weeks since 1980-01-06]
+    /// GPS Week Number (weeks since 1980-01-06)
     pub week_number: u16,
     /// Valid flags for timestamp components
     pub valid_flags: GpsTimestampValidFlags,
@@ -151,7 +151,7 @@ impl GpsTimestampValidFlags {
 /// (0xFF, 0xD4) Delta Time
 #[derive(Debug, Copy, Clone, PartialEq)]
 pub struct DeltaTime {
-    /// Time delta [seconds]
+    /// Time delta (seconds)
     pub dt_s: f64,
 }
 impl DeltaTime {
@@ -186,7 +186,7 @@ impl ReferenceTimestamp {
 /// (0xFF, 0xD6) Reference Time Delta
 #[derive(Debug, Copy, Clone, PartialEq)]
 pub struct ReferenceTimeDelta {
-    /// Time delta [seconds]
+    /// Time delta (seconds)
     pub dt_s: f64,
 }
 impl ReferenceTimeDelta {

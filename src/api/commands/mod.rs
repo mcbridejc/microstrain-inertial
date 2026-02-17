@@ -1,17 +1,30 @@
+//! Type definitions for commands and their reponses
 use thiserror::Error;
 
 use crate::{CRC_SIZE, HEADER_SIZE, SYNC1, SYNC2, checksum::Checksum, errors::ParseError};
 
+pub mod aiding;
 pub mod base;
+pub mod filter;
 pub mod imu_3dm;
+pub mod system;
 
-pub const BASE_DESCRIPTOR_SET: u8 = 1;
+
+/// The descriptor set for BASE commands
+pub const BASE_DESCRIPTOR_SET: u8 = 0x01;
+/// The descriptor set for 3DM commands
 pub const IMU_3DM_DESCRIPTOR_SET: u8 = 0x0C;
+/// The descriptor set for FILTER commands
 pub const FILTER_DESCRIPTOR_SET: u8 = 0x0D;
+/// The descriptor set for AIDING commands
 pub const AIDING_DESCRIPTOR_SET: u8 = 0x13;
+/// The descriptor set for SYSTEM commands
+pub const SYSTEM_DESCRIPTOR_SET: u8 = 0x7F;
 
+/// The descriptor value for AckNack used in all command descriptor sets
 pub const ACKNACK_DESCRIPTOR: u8 = 0xF1;
 
+/// Enum of possible AckNack reply code values
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 #[repr(u8)]
 pub enum AckNack {
@@ -26,10 +39,11 @@ pub enum AckNack {
 }
 
 impl AckNack {
+    /// Returns true if the acknack value indicates ack/succcess, and false if it is any other value
     pub fn is_ack(&self) -> bool {
         match self {
             Self::Ack => true,
-            _ => false
+            _ => false,
         }
     }
 }
@@ -97,8 +111,10 @@ pub trait CommandField {
     }
 }
 
-/// Every command gets a AckNack field in response; some commands get optional extra data in a
-/// second field. This struct combines those two into a single object to return in response to a
+/// Wrapper type for responses to commands
+/// 
+/// Every command gets an AckNack field in response. Some commands get optional extra data in a
+/// second field. This struct combines those two into a single type to return in response to a
 /// command.
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub struct CommandResponse<R: Clone + Copy + core::fmt::Debug> {
@@ -119,7 +135,7 @@ pub struct GenericCommandResponse<'a> {
 
 /// Iterator for individual command responses in a response packet
 ///
-/// From https://s3.amazonaws.com/files.microstrain.com/CV7%20Online/dcp_content/introduction/Command%20Overview.htm:
+/// From <https://s3.amazonaws.com/files.microstrain.com/CV7%20Online/dcp_content/introduction/Command%20Overview.htm>:
 ///
 ///    The reply contains at minimum a standard ACK/NACK field for every command in the originating
 ///    packet. This provides feedback as to whether the command was successfully executed, or why it
@@ -202,11 +218,12 @@ impl<'a> Iterator for CommandResponseIter<'a> {
     }
 }
 
+/// An error which occurs while serializing command packets
 #[derive(Clone, Copy, Debug, Error, PartialEq, Eq)]
 pub enum SerializeError {
     #[error("The provided write buffer was too short")]
     OutOfSpace,
-    #[error("Cannot combine fields from different descriptor sets into one packet")]
+    #[error("Cannot combine commands from different descriptor sets into one packet")]
     MixedDescriptorSet,
     #[error("Cannot send a command with no fields")]
     ZeroFields,

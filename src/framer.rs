@@ -1,3 +1,4 @@
+//! MIP Packet Framer/Parser
 use crate::{checksum::Checksum, errors::FrameError, serialize::OwnedMessage};
 
 const MAX_PAYLOAD: usize = 255;
@@ -129,12 +130,12 @@ impl MessageFramer {
     /// Push a new byte into the parser
     ///
     /// When a SYNC byte is expected and some other byte is received, a
-    /// [`ParseError::UnexpectedByte`] is returned. When the CRC is found not to match, a
-    /// [`ParseError::CrcMismatch`] is returned. In this case, the bytes which were previous parsed
+    /// [`FrameError::UnexpectedByte`] is returned. When the CRC is found not to match, a
+    /// [`FrameError::CrcMismatch`] is returned. In this case, the bytes which were previous parsed
     /// may contain valid messages, so they will be re-parsed starting from the original
     /// descriptor_set byte on the next call to push_byte. However, in order to read pending
     /// messages immediately without receiving a new byte, one can call
-    /// [`MessageParser::try_pending_message`].
+    /// [`MessageFramer::try_pending_message`].
     pub fn push_byte(&mut self, b: u8) -> Result<Option<RawMessage<'_>>, FrameError> {
         if self.pending_bytes.is_some() {
             if let Some(len) = self.consume_pending() {
