@@ -18,8 +18,9 @@ thiserror = "2.0.17"
 [dev-dependencies]
 clap = { version = "4.5.58", features = ["derive"] }
 critical-section = { version = "1.2.0", features = ["std"] }
+env_logger = "0.11.9"
 serialport = "4.8.1"
-tokio = { version = "1.49.0", features = ["macros", "rt"] }
+tokio = { version = "1.49.0", features = ["macros", "rt", "time"] }
 
 [features]
 default = ["serialport", "std"]

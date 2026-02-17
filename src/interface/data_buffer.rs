@@ -34,9 +34,6 @@ impl<const N: usize> DataBuffer<N> {
         if payload.len() > u8::MAX as usize {
             return Err(DataBufferError::PacketTooLarge);
         }
-        if !is_valid_payload_fields(payload) {
-            return Err(DataBufferError::InvalidPacket);
-        }
 
         let packet_len = payload.len() + 2;
         let prod = self.queue.stream_producer();
@@ -67,7 +64,8 @@ impl<const N: usize> DataBuffer<N> {
     pub fn read_packet(&self) -> Option<DataPacketGuard<'_, N>> {
         let cons = self.queue.stream_consumer();
         let grant = cons.read().ok()?;
-        let bytes = complete_packet_prefix_len(&grant[..], grant.len()).min(packet_len(&grant[..])?);
+        let bytes =
+            complete_packet_prefix_len(&grant[..], grant.len()).min(packet_len(&grant[..])?);
         if bytes < 2 {
             grant.release(0);
             return None;
@@ -84,9 +82,7 @@ impl<const N: usize> DataBuffer<N> {
             Ok(grant) => grant,
             Err(_) => return false,
         };
-        let available = packet_len(&grant[..]).is_some_and(|len| {
-            len <= grant.len() && is_valid_payload_fields(&grant[2..len])
-        });
+        let available = packet_len(&grant[..]).is_some_and(|len| len <= grant.len());
         grant.release(0);
         available
     }
@@ -98,8 +94,21 @@ pub struct DataPacketGuard<'a, const N: usize> {
 }
 
 impl<const N: usize> DataPacketGuard<'_, N> {
+    /// Get the full raw packet as a slice
+    ///
+    /// This includes the descriptor set byte, the payload len byte, and the paylod containing all fields
     pub fn as_slice(&self) -> &[u8] {
         &self.grant.as_ref().expect("missing read grant")[..self.bytes]
+    }
+
+    /// Get the payload for the data packet
+    pub fn payload(&self) -> &[u8] {
+        &self.as_slice()[2..]
+    }
+
+    /// Get the descriptor set for the packet
+    pub fn descriptor_set(&self) -> u8 {
+        self.as_slice()[0]
     }
 
     pub fn len(&self) -> usize {
@@ -119,6 +128,7 @@ impl<const N: usize> Drop for DataPacketGuard<'_, N> {
     }
 }
 
+/// Validate the the packet has an accurate length field
 fn is_valid_raw_packet(packet: &[u8]) -> bool {
     if packet.len() < 2 {
         return false;
@@ -126,21 +136,6 @@ fn is_valid_raw_packet(packet: &[u8]) -> bool {
     let payload_len = packet[1] as usize;
     if payload_len + 2 != packet.len() {
         return false;
-    }
-    is_valid_payload_fields(&packet[2..])
-}
-
-fn is_valid_payload_fields(payload: &[u8]) -> bool {
-    let mut used = 0usize;
-    while used < payload.len() {
-        if used + 2 > payload.len() {
-            return false;
-        }
-        let field_len = payload[used] as usize + 2;
-        if used + field_len > payload.len() {
-            return false;
-        }
-        used += field_len;
     }
     true
 }
@@ -164,9 +159,6 @@ fn complete_packet_prefix_len(src: &[u8], max_len: usize) -> usize {
             break;
         };
         if used + packet_len > limit {
-            break;
-        }
-        if !is_valid_payload_fields(&src[used + 2..used + packet_len]) {
             break;
         }
         used += packet_len;

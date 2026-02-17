@@ -38,18 +38,24 @@ pub fn start_serialport_thread<const DATA_BUFFER_SIZE: usize>(
     std::thread::Builder::new()
         .name("microstrain rx".into())
         .spawn(move || {
+            let mut read_buf = [0; 256];
+            let mut framer = MessageFramer::new();
             loop {
-                let mut read_buf = [0; 256];
-                let mut framer = MessageFramer::new();
                 let result = port.read(&mut read_buf);
                 if result.is_err() {
                     log::error!("Error reading serial port: {:?}", result.unwrap_err());
                     continue;
                 }
                 let cnt = result.unwrap();
+                log::debug!("Received {cnt} MIP bytes");
                 for b in &read_buf[..cnt] {
-                    if let Ok(Some(frame)) = framer.push_byte(*b) {
-                        rx_if.push_message(frame);
+                    match framer.push_byte(*b) {
+                        Ok(Some(frame)) => {
+                            log::debug!("Recieved MIP message");
+                            rx_if.push_message(frame);
+                        }
+                        Ok(None) => (),
+                        Err(e) => log::error!("Error framing incoming data: {e:?}"),
                     }
                 }
             }

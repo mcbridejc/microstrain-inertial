@@ -204,7 +204,7 @@ fn parse_matrix3f(data: &[u8]) -> Matrix3f {
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub struct PollData<'a> {
-    pub desc_set: u8,
+    pub descriptor_set: u8,
     pub suppress_ack: bool,
     pub descriptors: &'a [u8],
 }
@@ -225,7 +225,7 @@ impl CommandField for PollData<'_> {
         if buf.len() < need || need > u8::MAX as usize {
             return Err(SerializeError::OutOfSpace);
         }
-        buf[0] = self.desc_set;
+        buf[0] = self.descriptor_set;
         buf[1] = self.suppress_ack as u8;
         buf[2] = self.descriptors.len() as u8;
         buf[3..need].copy_from_slice(self.descriptors);
@@ -236,12 +236,12 @@ impl Imu3dmCommandField for PollData<'_> {}
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub struct GetDataBaseRate {
-    pub desc_set: u8,
+    pub descriptor_set: u8,
 }
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub struct GetDataBaseRateResponse {
-    pub desc_set: u8,
+    pub descriptor_set: u8,
     pub rate_hz: u16,
 }
 
@@ -251,7 +251,7 @@ impl CommandResponseData for GetDataBaseRateResponse {
             return Err(len_too_short(0x0E, 3, data.len()));
         }
         Ok(Self {
-            desc_set: data[0],
+            descriptor_set: data[0],
             rate_hz: parse_u16_be(&data[1..3]),
         })
     }
@@ -272,7 +272,7 @@ impl CommandField for GetDataBaseRate {
         if buf.is_empty() {
             return Err(SerializeError::OutOfSpace);
         }
-        buf[0] = self.desc_set;
+        buf[0] = self.descriptor_set;
         Ok(1)
     }
 }
@@ -281,26 +281,26 @@ impl Imu3dmCommandField for GetDataBaseRate {}
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub enum MessageFormat<'a> {
     Write {
-        desc_set: u8,
+        descriptor_set: u8,
         descriptors: &'a [DescriptorRate],
     },
     Read {
-        desc_set: u8,
+        descriptor_set: u8,
     },
     Save {
-        desc_set: u8,
+        descriptor_set: u8,
     },
     Load {
-        desc_set: u8,
+        descriptor_set: u8,
     },
     Default {
-        desc_set: u8,
+        descriptor_set: u8,
     },
 }
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub struct MessageFormatResponse {
-    pub desc_set: u8,
+    pub descriptor_set: u8,
     pub descriptors: [DescriptorRate; MAX_DESCRIPTOR_RATES],
     pub len: usize,
 }
@@ -332,7 +332,7 @@ impl CommandResponseData for MessageFormatResponse {
         }
 
         Ok(Self {
-            desc_set: data[0],
+            descriptor_set: data[0],
             descriptors,
             len: count,
         })
@@ -353,7 +353,7 @@ impl CommandField for MessageFormat<'_> {
     fn serialize_payload(&self, buf: &mut [u8]) -> Result<u8, SerializeError> {
         match self {
             Self::Write {
-                desc_set,
+                descriptor_set,
                 descriptors,
             } => {
                 let need = 3 + descriptors.len() * 3;
@@ -361,7 +361,7 @@ impl CommandField for MessageFormat<'_> {
                     return Err(SerializeError::OutOfSpace);
                 }
                 buf[0] = FunctionSelector::Write as u8;
-                buf[1] = *desc_set;
+                buf[1] = *descriptor_set;
                 buf[2] = descriptors.len() as u8;
                 for (i, entry) in descriptors.iter().enumerate() {
                     let b = 3 + i * 3;
@@ -370,36 +370,36 @@ impl CommandField for MessageFormat<'_> {
                 }
                 Ok(need as u8)
             }
-            Self::Read { desc_set } => {
+            Self::Read { descriptor_set } => {
                 if buf.len() < 2 {
                     return Err(SerializeError::OutOfSpace);
                 }
                 buf[0] = FunctionSelector::Read as u8;
-                buf[1] = *desc_set;
+                buf[1] = *descriptor_set;
                 Ok(2)
             }
-            Self::Save { desc_set } => {
+            Self::Save { descriptor_set } => {
                 if buf.len() < 2 {
                     return Err(SerializeError::OutOfSpace);
                 }
                 buf[0] = FunctionSelector::Save as u8;
-                buf[1] = *desc_set;
+                buf[1] = *descriptor_set;
                 Ok(2)
             }
-            Self::Load { desc_set } => {
+            Self::Load { descriptor_set } => {
                 if buf.len() < 2 {
                     return Err(SerializeError::OutOfSpace);
                 }
                 buf[0] = FunctionSelector::Load as u8;
-                buf[1] = *desc_set;
+                buf[1] = *descriptor_set;
                 Ok(2)
             }
-            Self::Default { desc_set } => {
+            Self::Default { descriptor_set } => {
                 if buf.len() < 2 {
                     return Err(SerializeError::OutOfSpace);
                 }
                 buf[0] = FunctionSelector::Default as u8;
-                buf[1] = *desc_set;
+                buf[1] = *descriptor_set;
                 Ok(2)
             }
         }
@@ -437,16 +437,16 @@ impl Imu3dmCommandField for FactoryStreaming {}
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub enum DataStreamControl {
-    Write { desc_set: u8, enable: bool },
-    Read { desc_set: u8 },
-    Save { desc_set: u8 },
-    Load { desc_set: u8 },
-    Default { desc_set: u8 },
+    Write { descriptor_set: u8, enable: bool },
+    Read { descriptor_set: u8 },
+    Save { descriptor_set: u8 },
+    Load { descriptor_set: u8 },
+    Default { descriptor_set: u8 },
 }
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub struct DataStreamControlResponse {
-    pub desc_set: u8,
+    pub descriptor_set: u8,
     pub enabled: bool,
 }
 
@@ -456,7 +456,7 @@ impl CommandResponseData for DataStreamControlResponse {
             return Err(len_too_short(0x11, 2, data.len()));
         }
         Ok(Self {
-            desc_set: data[0],
+            descriptor_set: data[0],
             enabled: data[1] != 0,
         })
     }
@@ -475,45 +475,48 @@ impl CommandField for DataStreamControl {
 
     fn serialize_payload(&self, buf: &mut [u8]) -> Result<u8, SerializeError> {
         match self {
-            Self::Write { desc_set, enable } => {
+            Self::Write {
+                descriptor_set,
+                enable,
+            } => {
                 if buf.len() < 3 {
                     return Err(SerializeError::OutOfSpace);
                 }
                 buf[0] = FunctionSelector::Write as u8;
-                buf[1] = *desc_set;
+                buf[1] = *descriptor_set;
                 buf[2] = *enable as u8;
                 Ok(3)
             }
-            Self::Read { desc_set } => {
+            Self::Read { descriptor_set } => {
                 if buf.len() < 2 {
                     return Err(SerializeError::OutOfSpace);
                 }
                 buf[0] = FunctionSelector::Read as u8;
-                buf[1] = *desc_set;
+                buf[1] = *descriptor_set;
                 Ok(2)
             }
-            Self::Save { desc_set } => {
+            Self::Save { descriptor_set } => {
                 if buf.len() < 2 {
                     return Err(SerializeError::OutOfSpace);
                 }
                 buf[0] = FunctionSelector::Save as u8;
-                buf[1] = *desc_set;
+                buf[1] = *descriptor_set;
                 Ok(2)
             }
-            Self::Load { desc_set } => {
+            Self::Load { descriptor_set } => {
                 if buf.len() < 2 {
                     return Err(SerializeError::OutOfSpace);
                 }
                 buf[0] = FunctionSelector::Load as u8;
-                buf[1] = *desc_set;
+                buf[1] = *descriptor_set;
                 Ok(2)
             }
-            Self::Default { desc_set } => {
+            Self::Default { descriptor_set } => {
                 if buf.len() < 2 {
                     return Err(SerializeError::OutOfSpace);
                 }
                 buf[0] = FunctionSelector::Default as u8;
-                buf[1] = *desc_set;
+                buf[1] = *descriptor_set;
                 Ok(2)
             }
         }
@@ -2383,33 +2386,33 @@ impl Imu3dmCommandField for GetCalibratedSensorRanges {}
 #[derive(Debug, Copy, Clone, PartialEq)]
 pub enum LowPassAntiAliasingFilter {
     Write {
-        desc_set: u8,
+        descriptor_set: u8,
         field_desc: u8,
         enable: bool,
         manual: bool,
         frequency_hz: f32,
     },
     Read {
-        desc_set: u8,
+        descriptor_set: u8,
         field_desc: u8,
     },
     Save {
-        desc_set: u8,
+        descriptor_set: u8,
         field_desc: u8,
     },
     Load {
-        desc_set: u8,
+        descriptor_set: u8,
         field_desc: u8,
     },
     Default {
-        desc_set: u8,
+        descriptor_set: u8,
         field_desc: u8,
     },
 }
 
 #[derive(Debug, Copy, Clone, PartialEq)]
 pub struct LowPassAntiAliasingFilterResponse {
-    pub desc_set: u8,
+    pub descriptor_set: u8,
     pub field_desc: u8,
     pub enable: bool,
     pub manual: bool,
@@ -2422,7 +2425,7 @@ impl CommandResponseData for LowPassAntiAliasingFilterResponse {
             return Err(len_too_short(0x54, 8, data.len()));
         }
         Ok(Self {
-            desc_set: data[0],
+            descriptor_set: data[0],
             field_desc: data[1],
             enable: data[2] != 0,
             manual: data[3] != 0,
@@ -2445,7 +2448,7 @@ impl CommandField for LowPassAntiAliasingFilter {
     fn serialize_payload(&self, buf: &mut [u8]) -> Result<u8, SerializeError> {
         match self {
             Self::Write {
-                desc_set,
+                descriptor_set,
                 field_desc,
                 enable,
                 manual,
@@ -2455,7 +2458,7 @@ impl CommandField for LowPassAntiAliasingFilter {
                     return Err(SerializeError::OutOfSpace);
                 }
                 buf[0] = FunctionSelector::Write as u8;
-                buf[1] = *desc_set;
+                buf[1] = *descriptor_set;
                 buf[2] = *field_desc;
                 buf[3] = *enable as u8;
                 buf[4] = *manual as u8;
@@ -2463,50 +2466,50 @@ impl CommandField for LowPassAntiAliasingFilter {
                 Ok(9)
             }
             Self::Read {
-                desc_set,
+                descriptor_set,
                 field_desc,
             } => {
                 if buf.len() < 3 {
                     return Err(SerializeError::OutOfSpace);
                 }
                 buf[0] = FunctionSelector::Read as u8;
-                buf[1] = *desc_set;
+                buf[1] = *descriptor_set;
                 buf[2] = *field_desc;
                 Ok(3)
             }
             Self::Save {
-                desc_set,
+                descriptor_set,
                 field_desc,
             } => {
                 if buf.len() < 3 {
                     return Err(SerializeError::OutOfSpace);
                 }
                 buf[0] = FunctionSelector::Save as u8;
-                buf[1] = *desc_set;
+                buf[1] = *descriptor_set;
                 buf[2] = *field_desc;
                 Ok(3)
             }
             Self::Load {
-                desc_set,
+                descriptor_set,
                 field_desc,
             } => {
                 if buf.len() < 3 {
                     return Err(SerializeError::OutOfSpace);
                 }
                 buf[0] = FunctionSelector::Load as u8;
-                buf[1] = *desc_set;
+                buf[1] = *descriptor_set;
                 buf[2] = *field_desc;
                 Ok(3)
             }
             Self::Default {
-                desc_set,
+                descriptor_set,
                 field_desc,
             } => {
                 if buf.len() < 3 {
                     return Err(SerializeError::OutOfSpace);
                 }
                 buf[0] = FunctionSelector::Default as u8;
-                buf[1] = *desc_set;
+                buf[1] = *descriptor_set;
                 buf[2] = *field_desc;
                 Ok(3)
             }
@@ -2521,7 +2524,9 @@ mod tests {
 
     #[test]
     fn test_get_data_base_rate_serialize() {
-        let cmd = GetDataBaseRate { desc_set: 0x80 };
+        let cmd = GetDataBaseRate {
+            descriptor_set: 0x80,
+        };
         let mut buf = [0u8; 8];
         let cnt = cmd.serialize(&mut buf).unwrap();
         assert_eq!(3, cnt);
@@ -2541,7 +2546,7 @@ mod tests {
             },
         ];
         let cmd = MessageFormat::Write {
-            desc_set: 0x80,
+            descriptor_set: 0x80,
             descriptors: &entries,
         };
         let mut buf = [0u8; 32];
@@ -2557,7 +2562,7 @@ mod tests {
     #[test]
     fn test_data_stream_control_response_parse() {
         let parsed = DataStreamControlResponse::from_data(&[0x80, 1]).unwrap();
-        assert_eq!(0x80, parsed.desc_set);
+        assert_eq!(0x80, parsed.descriptor_set);
         assert!(parsed.enabled);
     }
 }

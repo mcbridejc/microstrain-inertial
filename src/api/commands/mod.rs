@@ -25,6 +25,15 @@ pub enum AckNack {
     UnrecognizedReplyCode = 255,
 }
 
+impl AckNack {
+    pub fn is_ack(&self) -> bool {
+        match self {
+            Self::Ack => true,
+            _ => false
+        }
+    }
+}
+
 impl From<u8> for AckNack {
     fn from(value: u8) -> Self {
         use AckNack::*;

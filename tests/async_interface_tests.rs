@@ -9,7 +9,8 @@ use microstrain_inertial::interface::ReadDataError;
 
 #[test]
 fn test_ping_command() {
-    let interface = microstrain_inertial::interface::AsyncInterface::<1024>::new_with_data_buffer_size();
+    let interface =
+        microstrain_inertial::interface::AsyncInterface::<1024>::new_with_data_buffer_size();
 
     // Get the ping future
     let mut future = pin!(interface.ping());
@@ -42,7 +43,8 @@ fn test_ping_command() {
 
 #[test]
 fn test_read_raw_data() {
-    let interface = microstrain_inertial::interface::AsyncInterface::<64>::new_with_data_buffer_size();
+    let interface =
+        microstrain_inertial::interface::AsyncInterface::<64>::new_with_data_buffer_size();
     assert!(!interface.is_data_available());
 
     let msg = [0x80, 4, 2, 0x04, 0xAA, 0xBB];
@@ -63,7 +65,8 @@ fn test_read_raw_data() {
 
 #[test]
 fn test_read_raw_data_overrun() {
-    let interface = microstrain_inertial::interface::AsyncInterface::<6>::new_with_data_buffer_size();
+    let interface =
+        microstrain_inertial::interface::AsyncInterface::<6>::new_with_data_buffer_size();
 
     let msg = [0x80, 4, 2, 0x04, 0xAA, 0xBB];
     interface.push_message(RawMessage::new(&msg));

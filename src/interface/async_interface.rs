@@ -9,9 +9,10 @@ use thiserror::Error;
 
 use crate::MAX_PACKET_SIZE;
 use crate::api::commands::base::Ping;
+use crate::api::commands::imu_3dm::{DescriptorRate, MessageFormat};
 use crate::api::commands::{
-    CommandField, CommandResponse, CommandResponseData, CommandResponseIter, CommandSerialize,
-    SerializeError,
+    AckNack, CommandField, CommandResponse, CommandResponseData, CommandResponseIter,
+    CommandSerialize, SerializeError,
 };
 use crate::api::data::filter::FILTER_DESCRIPTOR_SET;
 use crate::api::data::sensor::SENSOR_DESCRIPTOR_SET;
@@ -33,6 +34,8 @@ pub enum CommandSendError {
     CommandInProgress,
     #[error("The received response did not match expectations")]
     UnexpectedResponse,
+    #[error("The device returned a NACK")]
+    Nack(AckNack),
 }
 
 #[derive(Clone, Copy, Debug, Error, PartialEq, Eq)]
@@ -191,6 +194,26 @@ impl SharedState {
     }
 }
 
+/// An IMU interface with an async API for sending commands and reading data stream from the IMU
+///
+/// ## Creation
+///
+/// An interface can be created with a default buffer size of [`DEFAULT_DATA_BUFFER_SIZE`]:
+///
+/// `AsyncInterface::new()`,
+///
+/// Or, iti can be created with a custom buffer size:
+///
+/// `AsyncInterface::<N>::new_with_data_buffer_size()`
+///
+/// ## Serial IO
+///
+/// The user application is responsible for reading and writing data to the interface using the
+/// [`Self::read_outgoing_bytes`] and [`Self::push_message`] methods. These are thread safe, using
+/// critical sections, and may be called from any context. When the `serialport` feature is enabled,
+/// the [`start_serialport_thread`](crate::serialport::start_serialport_thread) function may be used
+/// to launch background threads for IO.
+///  
 pub struct AsyncInterface<const DATA_BUFFER_SIZE: usize = DEFAULT_DATA_BUFFER_SIZE> {
     state: Mutex<RefCell<SharedState>>,
     data_buffer: DataBuffer<DATA_BUFFER_SIZE>,
@@ -236,7 +259,9 @@ impl<const DATA_BUFFER_SIZE: usize> AsyncInterface<DATA_BUFFER_SIZE> {
                     self.wake_data_reader();
                 }
                 Err(DataBufferError::InvalidPacket) => {
-                    log::warn!("Dropped invalid data packet for descriptor set {descriptor_set:#04x}");
+                    log::warn!(
+                        "Dropped invalid data packet for descriptor set {descriptor_set:#04x}"
+                    );
                 }
                 Err(DataBufferError::PacketTooLarge) => {
                     log::warn!(
@@ -251,6 +276,25 @@ impl<const DATA_BUFFER_SIZE: usize> AsyncInterface<DATA_BUFFER_SIZE> {
         &self,
     ) -> CommandResponseFuture<'_, <Ping as CommandField>::Response, DATA_BUFFER_SIZE> {
         self.send_command_field(&Ping {})
+    }
+
+    pub async fn set_message_format(
+        &self,
+        descriptor_set: u8,
+        descriptors: &[DescriptorRate],
+    ) -> Result<(), CommandSendError> {
+        let cmd = MessageFormat::Write {
+            descriptor_set,
+            descriptors,
+        };
+
+        let resp = self.send_command_field(&cmd).await?;
+
+        if !resp.acknack.is_ack() {
+            Err(CommandSendError::Nack(resp.acknack))
+        } else {
+            Ok(())
+        }
     }
 
     pub fn read_outgoing_bytes(&self, buf: &mut [u8]) -> usize {
