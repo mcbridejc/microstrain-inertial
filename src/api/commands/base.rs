@@ -319,7 +319,7 @@ impl CommandField for CommPortSpeed {
         }
         buf[0] = function_selector;
         buf[1] = port;
-        buf[2..6].copy_from_slice(&baud.to_le_bytes());
+        buf[2..6].copy_from_slice(&baud.to_be_bytes());
         Ok(6)
     }
 }
