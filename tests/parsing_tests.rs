@@ -12,7 +12,7 @@ use microstrain_inertial::{
         },
     },
     checksum::Checksum,
-    framer::MessageParser,
+    framer::MessageFramer,
     serialize::OwnedMessage,
 };
 
@@ -130,7 +130,7 @@ fn frame_payload(descriptor_set: u8, payload: &[u8]) -> Vec<u8> {
     frame
 }
 
-fn parse_bytes(parser: &mut MessageParser, data: &[u8]) -> Vec<OwnedMessage> {
+fn parse_bytes(parser: &mut MessageFramer, data: &[u8]) -> Vec<OwnedMessage> {
     let mut frames = Vec::new();
     for b in data {
         match parser.push_byte(*b).unwrap() {
@@ -158,7 +158,7 @@ fn test_parsing_multiple_sensor_fields() {
     .collect();
 
     let frame = frame_payload(SENSOR_DESCRIPTOR_SET, &payload);
-    let mut parser = MessageParser::new();
+    let mut parser = MessageFramer::new();
     let parsed = parse_bytes(&mut parser, &frame);
     assert_eq!(1, parsed.len());
 
@@ -214,7 +214,7 @@ fn test_parsing_multiple_filter_fields() {
 
     let frame = frame_payload(FILTER_DESCRIPTOR_SET, &payload);
 
-    let mut parser = MessageParser::new();
+    let mut parser = MessageFramer::new();
     let parsed = parse_bytes(&mut parser, &frame);
     assert_eq!(1, parsed.len());
 

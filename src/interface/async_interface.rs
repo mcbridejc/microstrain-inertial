@@ -1,35 +1,27 @@
 use core::cell::RefCell;
 use core::future::Future;
 use core::pin::Pin;
+use core::sync::atomic::{AtomicBool, Ordering};
 use core::task::{Context, Poll, Waker};
 
 use critical_section::Mutex;
 use thiserror::Error;
 
 use crate::MAX_PACKET_SIZE;
-use crate::api::commands::base::{BaseCommandField, BasePacket, Ping};
+use crate::api::commands::base::Ping;
 use crate::api::commands::{
-    self, CommandField, CommandResponse, CommandResponseData, CommandResponseIter,
-    CommandSerialize, SerializeError,
+    CommandField, CommandResponse, CommandResponseData, CommandResponseIter, CommandSerialize,
+    SerializeError,
 };
-use crate::api::data::sensor::{SENSOR_DESCRIPTOR_SET, ScaledAccel, SensorField, SensorPacket};
-use crate::errors::{FrameError, ParseError};
-use crate::framer::{MessageParser, RawMessage};
-use crate::serialize::OwnedMessage;
+use crate::api::data::filter::FILTER_DESCRIPTOR_SET;
+use crate::api::data::sensor::SENSOR_DESCRIPTOR_SET;
+use crate::api::data::shared::SHARED_DESCRIPTOR_SET;
+use crate::errors::ParseError;
+use crate::framer::RawMessage;
+use crate::interface::{DataBuffer, DataBufferError, DataPacketGuard};
 
-const MAX_COMMAND_FRAME_SIZE: usize = 260;
-
-#[derive(Debug, Error, Clone, PartialEq, Eq)]
-pub enum AsyncError {
-    #[error("command serialization failed")]
-    SerializeFailed,
-    #[error("no command waiter capacity")]
-    CommandCapacity,
-    #[error("no accelerometer waiter capacity")]
-    AccelWaiterCapacity,
-    #[error("waiter was cancelled")]
-    Cancelled,
-}
+const SYSTEM_DESCRIPTOR_SET: u8 = 0x81;
+pub const DEFAULT_DATA_BUFFER_SIZE: usize = 1024;
 
 #[derive(Clone, Copy, Debug, Error, PartialEq, Eq)]
 pub enum CommandSendError {
@@ -41,6 +33,12 @@ pub enum CommandSendError {
     CommandInProgress,
     #[error("The received response did not match expectations")]
     UnexpectedResponse,
+}
+
+#[derive(Clone, Copy, Debug, Error, PartialEq, Eq)]
+pub enum ReadDataError {
+    #[error("data buffer overrun")]
+    Overrun,
 }
 
 enum CommandSlotState {
@@ -72,10 +70,7 @@ impl CommandSlot {
     }
 
     pub fn busy(&self) -> bool {
-        match self.state {
-            CommandSlotState::Empty => false,
-            _ => true,
-        }
+        !matches!(self.state, CommandSlotState::Empty)
     }
 
     pub fn transmit(&mut self, cmd: &dyn CommandSerialize) -> Result<(), CommandSendError> {
@@ -94,33 +89,30 @@ impl CommandSlot {
 
     pub fn store_error(&mut self, e: CommandSendError) {
         self.state = CommandSlotState::Error(e);
+        if let Some(waker) = self.waker.take() {
+            waker.wake();
+        }
     }
 
     pub fn read_transmit_bytes(&mut self, buf: &mut [u8]) -> usize {
-        match self.state {
+        match &mut self.state {
             CommandSlotState::Transmit {
                 frame_size,
                 tx_pos,
                 descriptor_set: _,
             } => {
-                let read_len = buf.len().min(frame_size - tx_pos);
-                buf[..read_len].copy_from_slice(&self.frame_buf[tx_pos..tx_pos + read_len]);
+                let read_len = buf.len().min(*frame_size - *tx_pos);
+                buf[..read_len].copy_from_slice(&self.frame_buf[*tx_pos..*tx_pos + read_len]);
+                *tx_pos += read_len;
                 read_len
             }
             _ => 0,
         }
     }
 
-    /// The descriptor set for the in progress command
-    ///
-    /// None if no command is in progress
     pub fn expected_descriptor_set(&self) -> Option<u8> {
         match self.state {
-            CommandSlotState::Transmit {
-                frame_size: _,
-                tx_pos: _,
-                descriptor_set,
-            } => Some(descriptor_set),
+            CommandSlotState::Transmit { descriptor_set, .. } => Some(descriptor_set),
             _ => None,
         }
     }
@@ -129,76 +121,66 @@ impl CommandSlot {
         let len = resp_payload.len();
         self.frame_buf[..len].copy_from_slice(resp_payload);
         self.state = CommandSlotState::Completed { frame_size: len };
+        if let Some(waker) = self.waker.take() {
+            waker.wake();
+        }
+    }
+
+    pub fn register_waker(&mut self, waker: &Waker) {
+        if self.waker.as_ref().is_some_and(|w| w.will_wake(waker)) {
+            return;
+        }
+        self.waker = Some(waker.clone());
     }
 
     pub fn get_response<R: CommandResponseData>(
         &mut self,
     ) -> Option<Result<CommandResponse<R>, CommandSendError>> {
-        match self.state {
+        match core::mem::replace(&mut self.state, CommandSlotState::Empty) {
             CommandSlotState::Completed { frame_size } => {
                 let response_payload = &self.frame_buf[..frame_size];
-
-                let resp = CommandResponseIter::new(&response_payload).next();
-                if resp.is_none() {
+                let resp = CommandResponseIter::new(response_payload).next();
+                let Some(resp) = resp else {
                     return Some(Err(CommandSendError::UnexpectedResponse));
-                }
-                let resp = resp.unwrap();
-                if let Err(e) = resp {
-                    return Some(Err(e.into()));
-                }
-                let resp = resp.unwrap();
+                };
+                let resp = match resp {
+                    Ok(r) => r,
+                    Err(e) => return Some(Err(e.into())),
+                };
 
                 let acknack = resp.acknack;
                 let data = if let Some(data) = resp.data {
                     match R::from_data(data) {
-                        Ok(data) => Some(data),
+                        Ok(parsed) => Some(parsed),
                         Err(e) => return Some(Err(e.into())),
                     }
                 } else {
                     None
                 };
 
-                let resp = CommandResponse { acknack, data };
-
-                Some(Ok(resp))
+                Some(Ok(CommandResponse { acknack, data }))
             }
-            _ => None,
+            CommandSlotState::Error(e) => Some(Err(e)),
+            other => {
+                self.state = other;
+                None
+            }
         }
     }
 
-    /// Cancel a pending command
     pub fn cancel(&mut self) {
         self.state = CommandSlotState::Empty;
     }
 }
 
-struct CompletedCommand {
-    id: u64,
-    result: Result<OwnedMessage, AsyncError>,
-}
-
-pub trait DataWaiter: Send + Sync {
-    fn id(&self) -> u64;
-    fn wake(&self);
-    fn handle_message(&self, msg: &OwnedMessage) -> bool;
-}
-
-// struct DataWaiter {
-//     id: u64,
-//     result: Option<OwnedMessage>,
-//     waker: Option<Waker>,
-// }
-
-struct SharedState<'a> {
+struct SharedState {
     pending_command: CommandSlot,
-    data_waiters: &'a [&'a dyn DataWaiter],
 }
 
-impl<'a> SharedState<'a> {
-    fn new(data_waiters: &'a [&'a dyn DataWaiter]) -> Self {
+impl SharedState {
+    fn new() -> Self {
         Self {
             pending_command: CommandSlot::new(),
-            data_waiters,
         }
     }
 
@@ -207,131 +189,67 @@ impl<'a> SharedState<'a> {
             self.pending_command.store_error(e);
         }
     }
-
-    fn store_completed_command(&mut self, response: &RawMessage) {
-        self.pending_command.store_response(response.payload());
-    }
-
-    fn register_command_waker(&mut self, waker: &Waker) {
-        self.pending_command.waker = Some(waker.clone());
-    }
-
-    // fn cancel_command(&mut self, waiter_id: u32) {
-    //     if self
-    //         .in_flight
-    //         .as_ref()
-    //         .is_some_and(|slot| slot.id == waiter_id)
-    //     {
-    //         self.in_flight = None;
-    //         self.promote_queued_if_possible();
-    //         return;
-    //     }
-
-    //     if self
-    //         .queued
-    //         .as_ref()
-    //         .is_some_and(|slot| slot.id == waiter_id)
-    //     {
-    //         self.queued = None;
-    //         return;
-    //     }
-
-    //     if let Some(idx) = self.find_completed_index(waiter_id) {
-    //         self.completed[idx] = None;
-    //     }
-    // }
-
-    // fn register_accel_waiter(&mut self, waiter_id: u64) -> Result<(), AsyncError> {
-    //     for slot in &mut self.accel_waiters {
-    //         if slot.is_none() {
-    //             *slot = Some(AccelWaiter {
-    //                 id: waiter_id,
-    //                 result: None,
-    //                 waker: None,
-    //             });
-    //             return Ok(());
-    //         }
-    //     }
-    //     Err(AsyncError::AccelWaiterCapacity)
-    // }
-
-    // fn complete_data(&mut self, accel: ScaledAccel) {
-    //     for waiter in self.data_waiters {
-    //         if let Some(waiter) = waiter.as_mut().filter(|w| w.result.is_none()) {
-    //             waiter.result = Some(accel);
-    //             if let Some(waker) = waiter.waker.take() {
-    //                 waker.wake();
-    //             }
-    //         }
-    //     }
-    // }
-
-    // fn register_data_waker(&mut self, waiter_id: u64, waker: &Waker) -> bool {
-    //     for waiter in &mut self.data {
-    //         if let Some(waiter) = waiter.as_mut().filter(|w| w.id == waiter_id) {
-    //             waiter.waker = Some(waker.clone());
-    //             return true;
-    //         }
-    //     }
-    //     false
-    // }
-
-    // fn take_accel_result(&mut self, waiter_id: u64) -> Option<ScaledAccel> {
-    //     for waiter in &mut self.accel_waiters {
-    //         if let Some(existing) = waiter.as_mut().filter(|w| w.id == waiter_id) {
-    //             if let Some(result) = existing.result.take() {
-    //                 *waiter = None;
-    //                 return Some(result);
-    //             }
-    //             return None;
-    //         }
-    //     }
-    //     None
-    // }
-
-    // fn cancel_accel_waiter(&mut self, waiter_id: u64) {
-    //     for waiter in &mut self.accel_waiters {
-    //         if waiter.as_ref().is_some_and(|w| w.id == waiter_id) {
-    //             *waiter = None;
-    //             return;
-    //         }
-    //     }
-    // }
 }
 
-pub struct AsyncInterface<'a> {
-    state: Mutex<RefCell<SharedState<'a>>>,
+pub struct AsyncInterface<const DATA_BUFFER_SIZE: usize = DEFAULT_DATA_BUFFER_SIZE> {
+    state: Mutex<RefCell<SharedState>>,
+    data_buffer: DataBuffer<DATA_BUFFER_SIZE>,
+    data_waker: Mutex<RefCell<Option<Waker>>>,
+    data_overrun: AtomicBool,
 }
 
-impl<'a> AsyncInterface<'a> {
-    pub fn new(data_waiters: &'a [&'a dyn DataWaiter]) -> Self {
+impl<const DATA_BUFFER_SIZE: usize> AsyncInterface<DATA_BUFFER_SIZE> {
+    /// Create a new interface with an arbitraty DATA_BUFFER_SIZE generic
+    pub fn new_with_data_buffer_size() -> Self {
         Self {
-            state: Mutex::new(RefCell::new(SharedState::new(data_waiters))),
+            state: Mutex::new(RefCell::new(SharedState::new())),
+            data_buffer: DataBuffer::new(),
+            data_waker: Mutex::new(RefCell::new(None)),
+            data_overrun: AtomicBool::new(false),
         }
     }
 
-    /// Push message
+    pub fn is_data_available(&self) -> bool {
+        self.data_buffer.is_packet_available()
+    }
+
+    pub fn read_raw_data(&self) -> ReadRawDataFuture<'_, DATA_BUFFER_SIZE> {
+        ReadRawDataFuture { interface: self }
+    }
+
     pub fn push_message(&self, msg: RawMessage) {
-        // TODO: Handle data messages
-        // if msg.descriptor_set() == SENSOR_DESCRIPTOR_SET {
-        //     let packet = SensorPacket::new(msg.payload());
-        //     for field in packet.fields().flatten() {
-        //         if let SensorField::ScaledAccel(accel) = field {
-        //             state.complete_accel(accel);
-        //         }
-        //     }
-        // }
+        let descriptor_set = msg.descriptor_set();
 
         critical_section::with(|cs| {
             let mut state = self.state.borrow_ref_mut(cs);
             let pending = &mut state.pending_command;
-            if Some(msg.descriptor_set()) == pending.expected_descriptor_set() {
+            if Some(descriptor_set) == pending.expected_descriptor_set() {
                 pending.store_response(msg.payload());
             }
         });
+
+        if is_data_descriptor_set(descriptor_set) {
+            match self.data_buffer.push_packet(descriptor_set, msg.payload()) {
+                Ok(()) => self.wake_data_reader(),
+                Err(DataBufferError::InsufficientSpace) => {
+                    self.data_overrun.store(true, Ordering::Release);
+                    self.wake_data_reader();
+                }
+                Err(DataBufferError::InvalidPacket) => {
+                    log::warn!("Dropped invalid data packet for descriptor set {descriptor_set:#04x}");
+                }
+                Err(DataBufferError::PacketTooLarge) => {
+                    log::warn!(
+                        "Dropped oversized data packet for descriptor set {descriptor_set:#04x}"
+                    );
+                }
+            }
+        }
     }
 
-    pub fn ping<'b: 'a>(&'b self) -> CommandResponseFuture<'b, <Ping as CommandField>::Response> {
+    pub fn ping(
+        &self,
+    ) -> CommandResponseFuture<'_, <Ping as CommandField>::Response, DATA_BUFFER_SIZE> {
         self.send_command_field(&Ping {})
     }
 
@@ -342,7 +260,10 @@ impl<'a> AsyncInterface<'a> {
         })
     }
 
-    pub fn send_command_field<'b: 'a, R, C>(&'b self, command: &C) -> CommandResponseFuture<'b, R>
+    pub fn send_command_field<R, C>(
+        &self,
+        command: &C,
+    ) -> CommandResponseFuture<'_, R, DATA_BUFFER_SIZE>
     where
         R: CommandResponseData,
         C: CommandField<Response = R>,
@@ -355,29 +276,86 @@ impl<'a> AsyncInterface<'a> {
         CommandResponseFuture::new(self)
     }
 
-    // pub fn next_scaled_accel<'a>(
-    //     &'a self,
-    // ) -> Result<NextScaledAccelFuture<'a, N_ACCEL_WAITERS>, AsyncError> {
-    //     let mut state = self.state.borrow_mut();
-    //     let waiter_id = state.next_waiter_id();
-    //     state.register_accel_waiter(waiter_id)?;
+    fn register_data_waker(&self, waker: &Waker) {
+        critical_section::with(|cs| {
+            let mut slot = self.data_waker.borrow_ref_mut(cs);
+            if slot.as_ref().is_some_and(|w| w.will_wake(waker)) {
+                return;
+            }
+            *slot = Some(waker.clone());
+        });
+    }
 
-    //     Ok(NextScaledAccelFuture {
-    //         interface: self,
-    //         waiter_id,
-    //         done: false,
-    //     })
-    // }
+    fn clear_data_waker(&self) {
+        critical_section::with(|cs| {
+            let mut slot = self.data_waker.borrow_ref_mut(cs);
+            *slot = None;
+        });
+    }
+
+    fn wake_data_reader(&self) {
+        critical_section::with(|cs| {
+            let mut slot = self.data_waker.borrow_ref_mut(cs);
+            if let Some(waker) = slot.take() {
+                waker.wake();
+            }
+        });
+    }
 }
 
-pub struct CommandResponseFuture<'a, R> {
-    interface: &'a AsyncInterface<'a>,
+impl<const DATA_BUFFER_SIZE: usize> Default for AsyncInterface<DATA_BUFFER_SIZE> {
+    fn default() -> Self {
+        Self::new_with_data_buffer_size()
+    }
+}
+
+impl AsyncInterface<DEFAULT_DATA_BUFFER_SIZE> {
+    /// Create a new AsyncInterface with the default buffer size
+    pub fn new() -> Self {
+        Self::new_with_data_buffer_size()
+    }
+}
+
+pub struct ReadRawDataFuture<'a, const DATA_BUFFER_SIZE: usize> {
+    interface: &'a AsyncInterface<DATA_BUFFER_SIZE>,
+}
+
+impl<'a, const DATA_BUFFER_SIZE: usize> Future for ReadRawDataFuture<'a, DATA_BUFFER_SIZE> {
+    type Output = Result<DataPacketGuard<'a, DATA_BUFFER_SIZE>, ReadDataError>;
+
+    fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
+        let interface = self.interface;
+
+        if interface.data_overrun.swap(false, Ordering::AcqRel) {
+            return Poll::Ready(Err(ReadDataError::Overrun));
+        }
+        if let Some(packet) = interface.data_buffer.read_packet() {
+            return Poll::Ready(Ok(packet));
+        }
+
+        interface.register_data_waker(cx.waker());
+
+        if interface.data_overrun.swap(false, Ordering::AcqRel) {
+            interface.clear_data_waker();
+            return Poll::Ready(Err(ReadDataError::Overrun));
+        }
+        if let Some(packet) = interface.data_buffer.read_packet() {
+            interface.clear_data_waker();
+            return Poll::Ready(Ok(packet));
+        }
+
+        Poll::Pending
+    }
+}
+
+pub struct CommandResponseFuture<'a, R, const DATA_BUFFER_SIZE: usize> {
+    interface: &'a AsyncInterface<DATA_BUFFER_SIZE>,
     done: bool,
     _marker: core::marker::PhantomData<R>,
 }
 
-impl<'a, R> CommandResponseFuture<'a, R> {
-    pub fn new(interface: &'a AsyncInterface<'a>) -> Self {
+impl<'a, R, const DATA_BUFFER_SIZE: usize> CommandResponseFuture<'a, R, DATA_BUFFER_SIZE> {
+    pub fn new(interface: &'a AsyncInterface<DATA_BUFFER_SIZE>) -> Self {
         Self {
             interface,
             done: false,
@@ -386,7 +364,7 @@ impl<'a, R> CommandResponseFuture<'a, R> {
     }
 }
 
-impl<'a, R> Future for CommandResponseFuture<'a, R>
+impl<R, const DATA_BUFFER_SIZE: usize> Future for CommandResponseFuture<'_, R, DATA_BUFFER_SIZE>
 where
     R: CommandResponseData + Unpin,
 {
@@ -405,109 +383,31 @@ where
                 this.done = true;
                 Poll::Ready(resp)
             } else {
+                state.pending_command.register_waker(cx.waker());
                 Poll::Pending
             }
-            // if let Some(e) = state.command_error.take() {
-            //     this.done = true;
-            //     return Poll::Ready(Err(e));
-            // }
-            // if state.pending_command.is_none() {
-            //     // This should be impossible to do
-            //     panic!("Pending command is none but future is not completed!");
-            // }
-
-            // let pending = state.pending_command.as_mut().unwrap();
-            // if !pending.complete {
-            //     state.register_command_waker(cx.waker());
-            //     return Poll::Pending;
-            // } else {
-            //     this.done = true;
-            //     let result = pending.frame;
-            //     state.pending_command = None;
-
-            //     return Poll::Ready(Ok(result));
-            // }
         })
     }
 }
 
-impl<'a, R> Drop for CommandResponseFuture<'a, R> {
+impl<R, const DATA_BUFFER_SIZE: usize> Drop for CommandResponseFuture<'_, R, DATA_BUFFER_SIZE> {
     fn drop(&mut self) {
         if self.done {
             return;
         }
         critical_section::with(|cs| {
             let mut state = self.interface.state.borrow_ref_mut(cs);
-            //
             state.pending_command.cancel();
         })
     }
 }
 
-// pub struct NextScaledAccelFuture<'a, const N_ACCEL_WAITERS: usize> {
-//     interface: &'a AsyncInterface<N_ACCEL_WAITERS>,
-//     waiter_id: u64,
-//     done: bool,
-// }
-
-// impl<const N_ACCEL_WAITERS: usize> Future for NextScaledAccelFuture<'_, N_ACCEL_WAITERS> {
-//     type Output = ScaledAccel;
-
-//     fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
-//         let this = self.get_mut();
-//         if this.done {
-//             panic!("polled NextScaledAccelFuture after completion");
-//         }
-
-//         let mut state = this.interface.state.borrow_mut();
-//         if let Some(accel) = state.take_accel_result(this.waiter_id) {
-//             this.done = true;
-//             return Poll::Ready(accel);
-//         }
-
-//         if state.register_accel_waker(this.waiter_id, cx.waker()) {
-//             return Poll::Pending;
-//         }
-
-//         panic!("scaled accel waiter missing state");
-//     }
-// }
-
-// impl<const N_ACCEL_WAITERS: usize> Drop for NextScaledAccelFuture<'_, N_ACCEL_WAITERS> {
-//     fn drop(&mut self) {
-//         if self.done {
-//             return;
-//         }
-
-//         let mut state = self.interface.state.borrow_mut();
-//         state.cancel_accel_waiter(self.waiter_id);
-//     }
-// }
-
-// fn is_base_response_for_descriptor(msg: &OwnedMessage, expected_descriptor: u8) -> bool {
-//     if msg.descriptor_set() != commands::BASE_DESCRIPTOR_SET {
-//         return false;
-//     }
-
-//     let payload = msg.payload();
-//     let mut idx = 0usize;
-//     while idx + 2 <= payload.len() {
-//         let field_len = payload[idx] as usize;
-//         if field_len < 2 || idx + field_len > payload.len() {
-//             break;
-//         }
-
-//         let descriptor = payload[idx + 1];
-//         if descriptor == expected_descriptor {
-//             return true;
-//         }
-
-//         if descriptor == 0xF1 && field_len >= 4 && payload[idx + 2] == expected_descriptor {
-//             return true;
-//         }
-
-//         idx += field_len;
-//     }
-
-//     false
-// }
+fn is_data_descriptor_set(descriptor_set: u8) -> bool {
+    matches!(
+        descriptor_set,
+        SENSOR_DESCRIPTOR_SET
+            | FILTER_DESCRIPTOR_SET
+            | SHARED_DESCRIPTOR_SET
+            | SYSTEM_DESCRIPTOR_SET
+    )
+}

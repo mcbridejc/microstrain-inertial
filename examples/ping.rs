@@ -1,32 +1,27 @@
-use std::time::Duration;
+use std::{sync::Arc, time::Duration};
 
 use clap::Parser;
 use serialport::{SerialPort, TTYPort};
 
-use microstrain_inertial::api::commands::base::{BasePacket, Ping};
+use microstrain_inertial::{api::commands::base::{BasePacket, Ping}, interface::AsyncInterface, serialport::start_serialport_thread};
 
 #[derive(Parser)]
 struct Args {
     port: String,
 }
 
-fn main() {
-    let args = Args::parse();
 
-    let mut port = serialport::new(args.port, 115200).open().unwrap();
+#[tokio::main(flavor = "current_thread")]
+async fn main() {
+    let args = Args::parse();   
 
-    let mut packet_buf = [0u8; 256];
-    let mut cmd = BasePacket::new(&mut packet_buf);
+    let interface = Arc::new(AsyncInterface::new());
 
-    cmd.add_field(&Ping {}).unwrap();
-    cmd.add_field(&Ping {}).unwrap();
+    // Create background serial port IO which will move data between the interface and serial port
+    start_serialport_thread(&args.port, 115200, interface.clone()).expect("Failed to launch IO threads");
 
-    println!("Sending cmd: {:?}", cmd.as_bytes());
-    port.write_all(cmd.as_bytes()).unwrap();
+    let resp = interface.ping().await.expect("Error waiting for ping response");
 
-    std::thread::sleep(Duration::from_millis(500));
+    println!("Ping resp: {:?}", resp.acknack);
 
-    let cnt = port.read(&mut packet_buf).unwrap();
-
-    println!("Returned: {:?}", &packet_buf[..cnt]);
 }

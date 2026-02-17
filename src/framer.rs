@@ -1,5 +1,3 @@
-use thiserror::Error;
-
 use crate::{checksum::Checksum, errors::FrameError, serialize::OwnedMessage};
 
 const MAX_PAYLOAD: usize = 255;
@@ -32,7 +30,7 @@ impl<'a> RawMessage<'a> {
     }
 }
 
-pub struct MessageParser {
+pub struct MessageFramer {
     buf: [u8; MAX_PAYLOAD + 5],
     state: ParseState,
     pending_bytes: Option<(usize, usize)>,
@@ -49,13 +47,13 @@ enum ParseState {
     CheckL,
 }
 
-impl Default for MessageParser {
+impl Default for MessageFramer {
     fn default() -> Self {
         Self::new()
     }
 }
 
-impl MessageParser {
+impl MessageFramer {
     const SYNC1: u8 = 0x75;
     const SYNC2: u8 = 0x65;
 
@@ -244,13 +242,13 @@ impl MessageParser {
 
 #[cfg(test)]
 mod tests {
-    use crate::framer::{FrameError, MessageParser};
+    use crate::framer::{FrameError, MessageFramer};
 
     #[test]
     fn test_parse_message() {
         let count_payload: Vec<u8> = (0u8..32).collect();
         let mut msg = crate::serialize::OwnedMessage::new_with_payload(0x10, &count_payload);
-        let mut parser = MessageParser::new();
+        let mut parser = MessageFramer::new();
 
         let mut parsed = None;
         for (i, b) in msg.as_slice().iter().enumerate() {
@@ -274,7 +272,7 @@ mod tests {
         let msg1 = crate::serialize::OwnedMessage::new_with_payload(0x10, &count_payload[0..4]);
         let msg2 = crate::serialize::OwnedMessage::new_with_payload(0x20, &count_payload[0..8]);
         let msg3 = crate::serialize::OwnedMessage::new_with_payload(0x30, &count_payload);
-        let mut parser = MessageParser::new();
+        let mut parser = MessageFramer::new();
         // Intentially break the parser by making it expect as 128 byte message
         assert_eq!(Ok(None), parser.push_byte(0x75)); // SYNC1
         assert_eq!(Ok(None), parser.push_byte(0x65)); // SYNC2

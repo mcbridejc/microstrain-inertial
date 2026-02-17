@@ -5,10 +5,11 @@ use core::task::{Context, Poll, Waker};
 use microstrain_inertial::api::commands::AckNack;
 use microstrain_inertial::api::commands::base::{BasePacket, Ping};
 use microstrain_inertial::framer::RawMessage;
+use microstrain_inertial::interface::ReadDataError;
 
 #[test]
 fn test_ping_command() {
-    let interface = microstrain_inertial::interface::AsyncInterface::new(&[]);
+    let interface = microstrain_inertial::interface::AsyncInterface::<1024>::new_with_data_buffer_size();
 
     // Get the ping future
     let mut future = pin!(interface.ping());
@@ -37,4 +38,45 @@ fn test_ping_command() {
     };
     let response = result.expect("Future returned an error");
     assert_eq!(AckNack::Ack, response.acknack);
+}
+
+#[test]
+fn test_read_raw_data() {
+    let interface = microstrain_inertial::interface::AsyncInterface::<64>::new_with_data_buffer_size();
+    assert!(!interface.is_data_available());
+
+    let msg = [0x80, 4, 2, 0x04, 0xAA, 0xBB];
+    interface.push_message(RawMessage::new(&msg));
+    assert!(interface.is_data_available());
+
+    let mut future = pin!(interface.read_raw_data());
+    let mut cx = Context::from_waker(Waker::noop());
+    let poll_result = future.as_mut().poll(&mut cx);
+    let Poll::Ready(result) = poll_result else {
+        panic!("expected ready")
+    };
+    let packet = result.expect("unexpected data read error");
+    assert_eq!(packet.as_slice(), &[4, 0x80, 2, 0x04, 0xAA, 0xBB]);
+    drop(packet);
+    assert!(!interface.is_data_available());
+}
+
+#[test]
+fn test_read_raw_data_overrun() {
+    let interface = microstrain_inertial::interface::AsyncInterface::<6>::new_with_data_buffer_size();
+
+    let msg = [0x80, 4, 2, 0x04, 0xAA, 0xBB];
+    interface.push_message(RawMessage::new(&msg));
+    interface.push_message(RawMessage::new(&msg));
+
+    let mut future = pin!(interface.read_raw_data());
+    let mut cx = Context::from_waker(Waker::noop());
+    let poll_result = future.as_mut().poll(&mut cx);
+    let Poll::Ready(result) = poll_result else {
+        panic!("expected ready")
+    };
+    let Err(err) = result else {
+        panic!("expected overrun error")
+    };
+    assert_eq!(err, ReadDataError::Overrun);
 }
