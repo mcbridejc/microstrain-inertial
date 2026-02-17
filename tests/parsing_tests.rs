@@ -10,7 +10,10 @@ use microstrain_inertial::{
             sensor::{CompQuaternion, SENSOR_DESCRIPTOR_SET, ScaledAccel, SensorField},
             shared::{DeltaTime, GpsTimestamp, GpsTimestampValidFlags, SharedField},
         },
-    }, checksum::Checksum, framer::MessageParser, serialize::OwnedMessage
+    },
+    checksum::Checksum,
+    framer::MessageParser,
+    serialize::OwnedMessage,
 };
 
 const SYNC: [u8; 2] = [0x75, 0x65];

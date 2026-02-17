@@ -1,5 +1,7 @@
-
-use crate::{api::data::{filter::FilterPacket, sensor::SensorPacket}, errors::ParseError};
+use crate::{
+    api::data::{filter::FilterPacket, sensor::SensorPacket},
+    errors::ParseError,
+};
 
 pub mod commands;
 pub mod data;
@@ -9,7 +11,6 @@ pub enum Packet<'a> {
     Command(CommandPacket),
     Data(DataPacket<'a>),
 }
-
 
 impl<'a> Packet<'a> {
     pub fn from_frame(descriptor_set: u8, payload: &'a [u8]) -> Result<Self, ParseError> {

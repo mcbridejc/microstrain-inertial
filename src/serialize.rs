@@ -1,6 +1,7 @@
-
-use crate::{CRC_SIZE, HEADER_SIZE, MAX_PACKET_SIZE, MAX_PAYLOAD_SIZE, SYNC1, SYNC2, checksum::{self, Checksum}};
-
+use crate::{
+    CRC_SIZE, HEADER_SIZE, MAX_PACKET_SIZE, MAX_PAYLOAD_SIZE, SYNC1, SYNC2,
+    checksum::{self, Checksum},
+};
 
 #[derive(Clone, Copy, Debug)]
 pub struct OwnedMessage {

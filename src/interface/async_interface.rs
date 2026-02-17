@@ -177,7 +177,7 @@ struct CompletedCommand {
     result: Result<OwnedMessage, AsyncError>,
 }
 
-pub trait DataWaiter {
+pub trait DataWaiter: Send + Sync {
     fn id(&self) -> u64;
     fn wake(&self);
     fn handle_message(&self, msg: &OwnedMessage) -> bool;

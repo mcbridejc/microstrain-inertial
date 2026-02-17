@@ -3,8 +3,12 @@ use thiserror::Error;
 use crate::{CRC_SIZE, HEADER_SIZE, SYNC1, SYNC2, checksum::Checksum, errors::ParseError};
 
 pub mod base;
+pub mod imu_3dm;
 
 pub const BASE_DESCRIPTOR_SET: u8 = 1;
+pub const IMU_3DM_DESCRIPTOR_SET: u8 = 0x0C;
+pub const FILTER_DESCRIPTOR_SET: u8 = 0x0D;
+pub const AIDING_DESCRIPTOR_SET: u8 = 0x13;
 
 pub const ACKNACK_DESCRIPTOR: u8 = 0xF1;
 
@@ -67,6 +71,11 @@ pub trait CommandField {
     /// length and descriptor bytes.
     fn serialize_payload(&self, buf: &mut [u8]) -> Result<u8, SerializeError>;
 
+    /// Serialize the entire field
+    ///
+    /// This writes the field length, descriptor, and payload out to `buf`.
+    ///
+    /// It will fail if the buffer is too short.
     fn serialize(&self, buf: &mut [u8]) -> Result<u8, SerializeError> {
         if buf.len() < 2 {
             return Err(SerializeError::OutOfSpace);

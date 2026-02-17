@@ -1,10 +1,9 @@
 //! Filter descriptor set (0x82) data fields (full coverage).
 
-use crate::api::data::{Matrix3f, Quatf, Vector3d, Vector3f, shared::SharedField,
-};
-use crate::errors::ParseError;
-use crate::fields::{FieldParse, FieldIter};
 use super::{ReadBuf, ensure_len};
+use crate::api::data::{Matrix3f, Quatf, Vector3d, Vector3f, shared::SharedField};
+use crate::errors::ParseError;
+use crate::fields::{FieldIter, FieldParse};
 
 pub const FILTER_DESCRIPTOR_SET: u8 = 0x82;
 

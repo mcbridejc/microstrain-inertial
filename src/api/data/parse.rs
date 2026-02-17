@@ -3,7 +3,12 @@ use super::ParseError;
 use core::convert::TryInto;
 
 #[inline]
-pub fn need(bytes: &[u8], descriptor_set: u8, descriptor: u8, need: usize) -> Result<(), ParseError> {
+pub fn need(
+    bytes: &[u8],
+    descriptor_set: u8,
+    descriptor: u8,
+    need: usize,
+) -> Result<(), ParseError> {
     if bytes.len() < need {
         return Err(ParseError::LenTooShort {
             descriptor_set,

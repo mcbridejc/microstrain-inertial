@@ -1,6 +1,6 @@
 //! Complex MIP data types
 
-use crate::api::data::{ensure_len, ReadBuf as _};
+use crate::api::data::{ReadBuf as _, ensure_len};
 use crate::errors::ParseError;
 
 #[derive(Debug, Copy, Clone, PartialEq)]
