@@ -17,11 +17,10 @@ use crate::api::commands::{
 use crate::api::data::filter::FILTER_DESCRIPTOR_SET;
 use crate::api::data::sensor::SENSOR_DESCRIPTOR_SET;
 use crate::api::data::shared::SHARED_DESCRIPTOR_SET;
+use crate::api::data::system::SYSTEM_DESCRIPTOR_SET;
 use crate::errors::ParseError;
 use crate::framer::RawMessage;
 use crate::interface::{DataBuffer, DataBufferError, DataPacketGuard};
-
-const SYSTEM_DESCRIPTOR_SET: u8 = 0x81;
 pub const DEFAULT_DATA_BUFFER_SIZE: usize = 1024;
 
 #[derive(Clone, Copy, Debug, Error, PartialEq, Eq)]

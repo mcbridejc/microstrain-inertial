@@ -1,7 +1,7 @@
 //! Sensor descriptor set (0x80) data fields.
 
 use crate::api::data::{Matrix3f, Quatf, Vector3f, shared::SharedField};
-use crate::fields::{FieldIter, FieldParse};
+use crate::api::fields::{FieldIter, FieldParse};
 
 use super::{ParseError, ReadBuf, ensure_len};
 

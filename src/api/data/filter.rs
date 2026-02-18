@@ -2,8 +2,8 @@
 
 use super::{ReadBuf, ensure_len};
 use crate::api::data::{Matrix3f, Quatf, Vector3d, Vector3f, shared::SharedField};
+use crate::api::fields::{FieldIter, FieldParse};
 use crate::errors::ParseError;
-use crate::fields::{FieldIter, FieldParse};
 
 pub const FILTER_DESCRIPTOR_SET: u8 = 0x82;
 

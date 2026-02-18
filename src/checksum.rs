@@ -1,3 +1,7 @@
+//! MIP packet checksum utilities
+//!
+//! This is fletcher-like, but without the mod255 performed by some many fletcher16 implementations.
+
 /// Packet checksum implementation
 pub struct Checksum {
     a: u8,

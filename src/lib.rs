@@ -3,7 +3,6 @@
 pub mod api;
 pub mod checksum;
 pub mod errors;
-pub mod fields;
 pub mod framer;
 pub mod interface;
 pub mod serialize;

@@ -9,7 +9,6 @@ pub mod filter;
 pub mod imu_3dm;
 pub mod system;
 
-
 /// The descriptor set for BASE commands
 pub const BASE_DESCRIPTOR_SET: u8 = 0x01;
 /// The descriptor set for 3DM commands
@@ -112,7 +111,7 @@ pub trait CommandField {
 }
 
 /// Wrapper type for responses to commands
-/// 
+///
 /// Every command gets an AckNack field in response. Some commands get optional extra data in a
 /// second field. This struct combines those two into a single type to return in response to a
 /// command.
@@ -236,6 +235,43 @@ pub trait CommandSerialize {
     fn serialize_command(&self, buf: &mut [u8]) -> Result<usize, SerializeError>;
 
     fn descriptor_set(&self) -> u8;
+}
+
+impl<T: CommandField> CommandSerialize for T {
+    fn serialize_command(&self, buf: &mut [u8]) -> Result<usize, SerializeError> {
+        if buf.len() < HEADER_SIZE {
+            return Err(SerializeError::OutOfSpace);
+        }
+        buf[0] = SYNC1;
+        buf[1] = SYNC2;
+        buf[2] = self.descriptor_set();
+        // buf[3] will be payload len, but we don't know it yet
+
+        let mut pos = HEADER_SIZE;
+
+        // Serialize our own payload into the buffer
+        pos += (*self).serialize(&mut buf[pos..])? as usize;
+
+        // write payload len
+        buf[3] = pos as u8 - HEADER_SIZE as u8;
+
+        // Check that there are two bytes left for the CRC
+        if buf.len() - pos < CRC_SIZE {
+            return Err(SerializeError::OutOfSpace);
+        }
+        let mut chk = Checksum::new();
+        chk.update(&buf[..pos]);
+        let chk = chk.value();
+        buf[pos] = (chk >> 8) as u8;
+        buf[pos + 1] = chk as u8;
+        pos += 2;
+
+        Ok(pos)
+    }
+
+    fn descriptor_set(&self) -> u8 {
+        self.descriptor_set()
+    }
 }
 
 // A command packet is just a list of command fields, so we can implement CommandSerialize for any

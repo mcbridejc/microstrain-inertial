@@ -1,15 +1,12 @@
 use microstrain_inertial::{
-    api::{
-        DataPacket,
-        data::{
-            Quatf, Vector3f,
-            filter::{
-                AttitudeQuaternion, EulerAngles, FILTER_DESCRIPTOR_SET, FilterField, GyroBias,
-                ValidFlags,
-            },
-            sensor::{CompQuaternion, SENSOR_DESCRIPTOR_SET, ScaledAccel, SensorField},
-            shared::{DeltaTime, GpsTimestamp, GpsTimestampValidFlags, SharedField},
+    api::data::{
+        DataPacket, Quatf, Vector3f,
+        filter::{
+            AttitudeQuaternion, EulerAngles, FILTER_DESCRIPTOR_SET, FilterField, GyroBias,
+            ValidFlags,
         },
+        sensor::{CompQuaternion, SENSOR_DESCRIPTOR_SET, ScaledAccel, SensorField},
+        shared::{DeltaTime, GpsTimestamp, GpsTimestampValidFlags, SharedField},
     },
     checksum::Checksum,
     framer::MessageFramer,

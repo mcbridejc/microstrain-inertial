@@ -2,8 +2,8 @@ use core::future::Future;
 use core::pin::pin;
 use core::task::{Context, Poll, Waker};
 
-use microstrain_inertial::api::commands::AckNack;
-use microstrain_inertial::api::commands::base::{BasePacket, Ping};
+use microstrain_inertial::api::commands::base::Ping;
+use microstrain_inertial::api::commands::{AckNack, CommandSerialize};
 use microstrain_inertial::framer::RawMessage;
 use microstrain_inertial::interface::ReadDataError;
 
@@ -21,8 +21,9 @@ fn test_ping_command() {
     assert!(poll_result.is_pending(), "Poll returned: {:?}", poll_result);
 
     // Read the transmit data, and check that it contains the expected ping command packet
-    let mut packet = BasePacket::from_fields(&[&Ping {}]).unwrap();
-    let exp_bytes = packet.as_slice();
+    let mut write_buf = [0; 255];
+    let packet_size = Ping {}.serialize_command(&mut write_buf).unwrap();
+    let exp_bytes = &write_buf[..packet_size];
     let mut read_buf = [0u8; 100];
     let read_count = interface.read_outgoing_bytes(&mut read_buf);
     assert_eq!(exp_bytes, &read_buf[..read_count]);
