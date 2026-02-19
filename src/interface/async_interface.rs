@@ -38,6 +38,7 @@ pub enum CommandSendError {
 }
 
 #[derive(Clone, Copy, Debug, Error, PartialEq, Eq)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub enum ReadDataError {
     #[error("data buffer overrun")]
     Overrun,
@@ -63,7 +64,7 @@ struct CommandSlot {
 }
 
 impl CommandSlot {
-    pub fn new() -> Self {
+    pub const fn new() -> Self {
         Self {
             frame_buf: [0; MAX_PACKET_SIZE],
             waker: None,
@@ -180,7 +181,7 @@ struct SharedState {
 }
 
 impl SharedState {
-    fn new() -> Self {
+    const fn new() -> Self {
         Self {
             pending_command: CommandSlot::new(),
         }
@@ -222,7 +223,7 @@ pub struct AsyncInterface<const DATA_BUFFER_SIZE: usize = DEFAULT_DATA_BUFFER_SI
 
 impl<const DATA_BUFFER_SIZE: usize> AsyncInterface<DATA_BUFFER_SIZE> {
     /// Create a new interface with an arbitraty DATA_BUFFER_SIZE generic
-    pub fn new_with_data_buffer_size() -> Self {
+    pub const fn new_with_data_buffer_size() -> Self {
         Self {
             state: Mutex::new(RefCell::new(SharedState::new())),
             data_buffer: DataBuffer::new(),
@@ -352,7 +353,7 @@ impl<const DATA_BUFFER_SIZE: usize> Default for AsyncInterface<DATA_BUFFER_SIZE>
 
 impl AsyncInterface<DEFAULT_DATA_BUFFER_SIZE> {
     /// Create a new AsyncInterface with the default buffer size
-    pub fn new() -> Self {
+    pub const fn new() -> Self {
         Self::new_with_data_buffer_size()
     }
 }

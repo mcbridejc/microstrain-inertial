@@ -2,6 +2,7 @@ use thiserror::Error;
 
 /// Error returned by Parser
 #[derive(Clone, Copy, Debug, Error, PartialEq, Eq)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub enum FrameError {
     #[error("A CRC mismatch occurred")]
     CrcMismatch,
@@ -11,6 +12,7 @@ pub enum FrameError {
 
 /// Error when parsing MIP packet fields
 #[derive(Clone, Copy, Debug, Error, PartialEq, Eq)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub enum ParseError {
     #[error(
         "Length of data didn't match expected for 0x{descriptor_set:x}:0x{descriptor:x}. Need: {need}. Got: {got}"

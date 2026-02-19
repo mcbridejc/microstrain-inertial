@@ -17,6 +17,7 @@ fn ensure_len(buf: &&[u8], need: usize, descriptor: (u8, u8)) -> Result<(), Pars
 }
 
 #[derive(Debug, Copy, Clone, PartialEq)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub struct Vector3f {
     pub x: f32,
     pub y: f32,
@@ -50,6 +51,7 @@ impl Vector3f {
 }
 
 #[derive(Debug, Copy, Clone, PartialEq)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub struct Vector3d {
     pub x: f64,
     pub y: f64,
@@ -83,6 +85,7 @@ impl Vector3d {
 }
 
 #[derive(Debug, Copy, Clone, PartialEq)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub struct Matrix3f {
     /// Row-major: `m[r][c] => data[r*3 + c]`
     pub data: [f32; 9],
@@ -108,6 +111,7 @@ impl Matrix3f {
 }
 
 #[derive(Debug, Copy, Clone, PartialEq)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub struct Quatf {
     /// (w, x, y, z)
     pub w: f32,

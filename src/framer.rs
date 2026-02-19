@@ -58,7 +58,7 @@ impl MessageFramer {
     const SYNC1: u8 = 0x75;
     const SYNC2: u8 = 0x65;
 
-    pub fn new() -> Self {
+    pub const fn new() -> Self {
         Self {
             buf: [0; MAX_PAYLOAD + 5],
             state: ParseState::Sync1,
