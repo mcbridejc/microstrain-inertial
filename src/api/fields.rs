@@ -48,6 +48,10 @@ impl<'a, T: FieldParse> Iterator for FieldIter<'a, T> {
         let field_len = buf[0] as usize;
         let descriptor = buf[1];
 
+        if field_len < 2 {
+            return Some(Err(ParseError::InvalidFieldLEngth));
+        }
+
         if buf.len() < field_len {
             let err = ParseError::LenTooShort {
                 descriptor_set: T::DESCRIPTOR_SET,

@@ -1,3 +1,5 @@
+//! Error types
+
 use thiserror::Error;
 
 /// Error returned by Parser
@@ -29,4 +31,6 @@ pub enum ParseError {
     UnknownDescriptorSet { descriptor_set: u8 },
     #[error("Expected an AckNack field, found 0x{descriptor:x} instead.")]
     MissingAck { descriptor: u8 },
+    #[error("A field had a length < 2, which is malformed")]
+    InvalidFieldLEngth,
 }
