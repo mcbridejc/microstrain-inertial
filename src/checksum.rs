@@ -8,6 +8,12 @@ pub struct Checksum {
     b: u8,
 }
 
+impl Default for Checksum {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl Checksum {
     pub fn new() -> Self {
         Self { a: 0, b: 0 }

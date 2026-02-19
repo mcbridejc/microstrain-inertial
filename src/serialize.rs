@@ -45,7 +45,7 @@ impl OwnedMessage {
     }
 
     pub fn payload_mut(&mut self) -> &mut [u8] {
-        let payload_len = self.buf.len() as usize - CRC_SIZE;
+        let payload_len = self.buf.len() - CRC_SIZE;
         &mut self.buf[HEADER_SIZE..payload_len]
     }
 

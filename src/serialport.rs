@@ -23,10 +23,10 @@ pub fn start_serialport_thread<const DATA_BUFFER_SIZE: usize>(
             loop {
                 let mut tx_buf = [0; 256];
                 let cnt = tx_if.read_outgoing_bytes(&mut tx_buf);
-                if cnt > 0 {
-                    if let Err(e) = tx_port.write_all(&tx_buf[..cnt]) {
-                        log::error!("Error writing to serial port: {:?}", e);
-                    }
+                if cnt > 0
+                    && let Err(e) = tx_port.write_all(&tx_buf[..cnt])
+                {
+                    log::error!("Error writing to serial port: {:?}", e);
                 }
                 // TODO: A wakeup signal from the interface would be good...
                 std::thread::sleep(Duration::from_millis(10));

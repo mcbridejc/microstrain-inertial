@@ -14,64 +14,28 @@ const MAX_U8_PAIRS: usize = 126;
 const MAX_PARAM_BYTES: usize = 250;
 const MAX_RANGE_ENTRIES: usize = 50;
 
-#[derive(Debug, Copy, Clone, PartialEq, Eq)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Default)]
 pub struct DescriptorRate {
     pub descriptor: u8,
     pub decimation: u16,
 }
 
-impl Default for DescriptorRate {
-    fn default() -> Self {
-        Self {
-            descriptor: 0,
-            decimation: 0,
-        }
-    }
-}
-
-#[derive(Debug, Copy, Clone, PartialEq, Eq)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Default)]
 pub struct SupportedEventInfo {
     pub event_type: u8,
     pub count: u8,
 }
 
-impl Default for SupportedEventInfo {
-    fn default() -> Self {
-        Self {
-            event_type: 0,
-            count: 0,
-        }
-    }
-}
-
-#[derive(Debug, Copy, Clone, PartialEq, Eq)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Default)]
 pub struct TriggerStatusEntry {
     pub trigger_type: u8,
     pub status: u8,
 }
 
-impl Default for TriggerStatusEntry {
-    fn default() -> Self {
-        Self {
-            trigger_type: 0,
-            status: 0,
-        }
-    }
-}
-
-#[derive(Debug, Copy, Clone, PartialEq, Eq)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Default)]
 pub struct ActionStatusEntry {
     pub action_type: u8,
     pub trigger_id: u8,
-}
-
-impl Default for ActionStatusEntry {
-    fn default() -> Self {
-        Self {
-            action_type: 0,
-            trigger_id: 0,
-        }
-    }
 }
 
 #[derive(Debug, Copy, Clone, PartialEq)]

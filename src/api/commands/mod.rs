@@ -309,7 +309,7 @@ impl<T: CommandResponseData> CommandSerialize for &[&dyn CommandField<Response =
     }
 
     fn descriptor_set(&self) -> u8 {
-        if self.len() > 0 {
+        if !self.is_empty() {
             self[0].descriptor_set()
         } else {
             // Unclear what should happen here? Creating messages with zero fields doesn't make
