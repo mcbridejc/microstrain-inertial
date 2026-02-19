@@ -54,5 +54,5 @@ pub enum ParseError {
     },
     /// field length less than 2
     #[error("A field had a length < 2, which is malformed")]
-    InvalidFieldLEngth,
+    InvalidFieldLength,
 }

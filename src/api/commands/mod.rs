@@ -181,6 +181,9 @@ impl<'a> Iterator for CommandResponseIter<'a> {
             return None;
         }
         let len = remaining_bytes[0] as usize;
+        if len < 2 {
+            return Some(Err(ParseError::InvalidFieldLength));
+        }
         let descriptor = remaining_bytes[1];
         if remaining_bytes.len() < len {
             return Some(Err(ParseError::LenTooShort {
@@ -219,6 +222,17 @@ impl<'a> Iterator for CommandResponseIter<'a> {
             let len = remaining_bytes[0] as usize;
             let descriptor = remaining_bytes[1];
             if descriptor != ACKNACK_DESCRIPTOR {
+                if len < 2 {
+                    return Some(Err(ParseError::InvalidFieldLength));
+                }
+                if remaining_bytes.len() < len {
+                    return Some(Err(ParseError::LenTooShort {
+                        descriptor_set: 0,
+                        descriptor,
+                        need: len,
+                        got: remaining_bytes.len(),
+                    }));
+                }
                 self.pos += len;
                 response_data = Some(&remaining_bytes[2..len]);
             }
@@ -350,7 +364,10 @@ impl<T: CommandResponseData> CommandSerialize for &[&dyn CommandField<Response =
 
 #[cfg(test)]
 mod tests {
-    use super::{CommandField, CommandSerialize, SerializeError};
+    use super::{
+        ACKNACK_DESCRIPTOR, CommandField, CommandResponseIter, CommandSerialize, SerializeError,
+    };
+    use crate::errors::ParseError;
 
     struct Ds01Cmd;
     impl CommandField for Ds01Cmd {
@@ -402,5 +419,43 @@ mod tests {
         let mut buf = [0u8; 32];
         let err = fields.serialize_command(&mut buf).unwrap_err();
         assert_eq!(SerializeError::MixedDescriptorSet, err);
+    }
+
+    #[test]
+    fn command_response_iter_rejects_ack_field_len_lt_2() {
+        let payload = [1, ACKNACK_DESCRIPTOR];
+        let mut iter = CommandResponseIter::new(&payload);
+        assert_eq!(
+            Some(Err(ParseError::InvalidFieldLength)),
+            iter.next().map(|r| r.map(|_| ()))
+        );
+    }
+
+    #[test]
+    fn command_response_iter_rejects_response_field_len_lt_2() {
+        // Valid ack field (len=4, descriptor=0xF1, cmd descriptor=0x01, ack=0), then malformed
+        // response field with len=1.
+        let payload = [4, ACKNACK_DESCRIPTOR, 0x01, 0x00, 1, 0x55];
+        let mut iter = CommandResponseIter::new(&payload);
+        assert_eq!(
+            Some(Err(ParseError::InvalidFieldLength)),
+            iter.next().map(|r| r.map(|_| ()))
+        );
+    }
+
+    #[test]
+    fn command_response_iter_rejects_truncated_response_field() {
+        // Valid ack field followed by response field claiming len=6, but only 3 bytes remain.
+        let payload = [4, ACKNACK_DESCRIPTOR, 0x01, 0x00, 6, 0x55, 0xAA];
+        let mut iter = CommandResponseIter::new(&payload);
+        assert_eq!(
+            Some(Err(ParseError::LenTooShort {
+                descriptor_set: 0,
+                descriptor: 0x55,
+                need: 6,
+                got: 3,
+            })),
+            iter.next().map(|r| r.map(|_| ()))
+        );
     }
 }
