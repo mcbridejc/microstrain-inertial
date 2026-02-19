@@ -5,6 +5,7 @@ license = "MIT"
 description = "Library for communicating with Microstrain inertial measurement units via MIP protocol"
 keywords = ["no_std", "embedded", "parser", "IMU"]
 categories = ["embedded", "no-std", "no-std::no-alloc"]
+repository = "https://github.com/mcbridejc/microstrain-inertial"
 
 version = "0.0.1"
 edition = "2024"
