@@ -49,7 +49,9 @@ impl<'a, T: FieldParse> Iterator for FieldIter<'a, T> {
         let descriptor = buf[1];
 
         if field_len < 2 {
-            return Some(Err(ParseError::InvalidFieldLEngth));
+            // Cannot keep parsing
+            self.remaining = &[];
+            return Some(Err(ParseError::InvalidFieldLength));
         }
 
         if buf.len() < field_len {
@@ -67,5 +69,46 @@ impl<'a, T: FieldParse> Iterator for FieldIter<'a, T> {
         self.remaining = rest;
         let payload = &field[2..]; // skip len and descriptor bytes
         Some(T::parse(descriptor, payload))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{FieldIter, FieldParse};
+    use crate::errors::ParseError;
+
+    #[derive(Debug, PartialEq, Eq)]
+    struct DummyField;
+
+    impl FieldParse for DummyField {
+        const DESCRIPTOR_SET: u8 = 0xAA;
+
+        fn parse(_descriptor: u8, _payload: &[u8]) -> Result<Self, ParseError> {
+            Ok(DummyField)
+        }
+    }
+
+    #[test]
+    fn field_iter_rejects_field_len_lt_2_and_stops() {
+        let bytes = [1, 0x10];
+        let mut it = FieldIter::<DummyField>::new(&bytes);
+        assert_eq!(Some(Err(ParseError::InvalidFieldLength)), it.next());
+        assert_eq!(None, it.next());
+    }
+
+    #[test]
+    fn field_iter_reports_len_too_short_and_stops() {
+        let bytes = [4, 0x10, 0xFF];
+        let mut it = FieldIter::<DummyField>::new(&bytes);
+        assert_eq!(
+            Some(Err(ParseError::LenTooShort {
+                descriptor_set: 0xAA,
+                descriptor: 0x10,
+                need: 4,
+                got: 3,
+            })),
+            it.next()
+        );
+        assert_eq!(None, it.next());
     }
 }
