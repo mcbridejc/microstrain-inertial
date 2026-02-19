@@ -12,7 +12,7 @@ This was created and tested with the 3DM-CV7, but should be generally applicable
 microstrain devices -- though it may not have the complete set of messages implemented and require
 extending. It supporst both no_std/no_alloc microcontroller environments, as well as on a PC.
 
-See the [crate documentation](https://docs.rs/zencan-node) for usage info.
+See the [crate documentation](https://docs.rs/microstrain-inertial) for usage info.
 
 ## Sponsors
 
