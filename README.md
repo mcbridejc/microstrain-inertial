@@ -1,7 +1,7 @@
 # microstrain inertial
 
-[![crates](https://img.shields.io/crates/v/zencan-node.svg)](https://crates.io/crates/zencan-node)
-[![docs](https://img.shields.io/docsrs/zencan-node)](https://docs.rs/zencan-node)
+[![crates](https://img.shields.io/crates/v/microstrain-inertial.svg)](https://crates.io/crates/microstrain-inertial)
+[![docs](https://img.shields.io/docsrs/microstrain-inertial)](https://docs.rs/microstrain-inertial)
 
 Rust implementation of the Microstrain Inertial Packet (MIP) protocol used for communicating with
 Microstrain 3DM inertial measurement units.
