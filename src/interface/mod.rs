@@ -9,7 +9,7 @@ pub use async_interface::*;
 pub use data_buffer::*;
 
 use crate::{
-    api::commands::{AckNack, SerializeError},
+    api::commands::SerializeError,
     errors::ParseError,
 };
 
@@ -37,7 +37,4 @@ pub enum CommandSendError {
     ///The received response did not match expectations
     #[error("The received response did not match expectations")]
     UnexpectedResponse,
-    /// The device returned a NACK
-    #[error("The device returned a NACK")]
-    Nack(AckNack),
 }
