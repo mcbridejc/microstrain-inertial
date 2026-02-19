@@ -13,7 +13,6 @@ pub fn start_serialport_thread<const DATA_BUFFER_SIZE: usize>(
 ) -> Result<(), std::io::Error> {
     let port = Arc::new(SerialPort::open(port, baud)?);
 
-    let interface = Arc::new(interface);
 
     let tx_if = interface.clone();
     let tx_port = port.clone();
@@ -31,8 +30,7 @@ pub fn start_serialport_thread<const DATA_BUFFER_SIZE: usize>(
                 // TODO: A wakeup signal from the interface would be good...
                 std::thread::sleep(Duration::from_millis(10));
             }
-        })
-        .unwrap();
+        })?;
 
     let rx_if = interface.clone();
     std::thread::Builder::new()
@@ -63,7 +61,6 @@ pub fn start_serialport_thread<const DATA_BUFFER_SIZE: usize>(
                     }
                 }
             }
-        })
-        .unwrap();
+        })?;
     Ok(())
 }
