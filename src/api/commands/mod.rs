@@ -52,11 +52,12 @@ impl From<u8> for AckNack {
         use AckNack::*;
         match value {
             0 => Ack,
-            1 => BadChecksum,
-            2 => InvalidParameter,
-            3 => CommandFailed,
-            4 => CommandTimeout,
-            5 => UnknownDescriptorSet,
+            1 => UnknownCommand,
+            2 => BadChecksum,
+            3 => InvalidParameter,
+            4 => CommandFailed,
+            5 => CommandTimeout,
+            6 => UnknownDescriptorSet,
             _ => UnrecognizedReplyCode,
         }
     }
