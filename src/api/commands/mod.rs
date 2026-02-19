@@ -151,6 +151,9 @@ pub struct CommandResponseIter<'a> {
 }
 
 impl<'a> CommandResponseIter<'a> {
+    /// Create new command response iter
+    ///
+    /// `payload` is the payload of the command response packet. It does not include the sync bytes, descriptor set or payload len bytes.
     pub fn new(payload: &'a [u8]) -> Self {
         Self { payload, pos: 0 }
     }
@@ -279,12 +282,23 @@ impl<T: CommandField> CommandSerialize for T {
 // slice of fields
 impl<T: CommandResponseData> CommandSerialize for &[&dyn CommandField<Response = T>] {
     fn serialize_command(&self, buf: &mut [u8]) -> Result<usize, SerializeError> {
+        if self.is_empty() {
+            return Err(SerializeError::ZeroFields);
+        }
+        let descriptor_set = self[0].descriptor_set();
+        if self
+            .iter()
+            .any(|field| field.descriptor_set() != descriptor_set)
+        {
+            return Err(SerializeError::MixedDescriptorSet);
+        }
+
         if buf.len() < HEADER_SIZE {
             return Err(SerializeError::OutOfSpace);
         }
         buf[0] = SYNC1;
         buf[1] = SYNC2;
-        buf[2] = self.descriptor_set();
+        buf[2] = descriptor_set;
         // buf[3] will be payload len, but we don't know it yet
 
         let mut pos = 4;
@@ -317,5 +331,62 @@ impl<T: CommandResponseData> CommandSerialize for &[&dyn CommandField<Response =
             // sense to do I think.
             0
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{CommandField, CommandSerialize, SerializeError};
+
+    struct Ds01Cmd;
+    impl CommandField for Ds01Cmd {
+        type Response = ();
+
+        fn descriptor_set(&self) -> u8 {
+            0x01
+        }
+
+        fn descriptor(&self) -> u8 {
+            0x10
+        }
+
+        fn serialize_payload(&self, _buf: &mut [u8]) -> Result<u8, SerializeError> {
+            Ok(0)
+        }
+    }
+
+    struct Ds0cCmd;
+    impl CommandField for Ds0cCmd {
+        type Response = ();
+
+        fn descriptor_set(&self) -> u8 {
+            0x0C
+        }
+
+        fn descriptor(&self) -> u8 {
+            0x11
+        }
+
+        fn serialize_payload(&self, _buf: &mut [u8]) -> Result<u8, SerializeError> {
+            Ok(0)
+        }
+    }
+
+    #[test]
+    fn serialize_zero_field_packet_returns_error() {
+        let fields: &[&dyn CommandField<Response = ()>] = &[];
+        let mut buf = [0u8; 32];
+        let err = fields.serialize_command(&mut buf).unwrap_err();
+        assert_eq!(SerializeError::ZeroFields, err);
+    }
+
+    #[test]
+    fn serialize_mixed_descriptor_set_packet_returns_error() {
+        let c1 = Ds01Cmd;
+        let c2 = Ds0cCmd;
+        let fields: &[&dyn CommandField<Response = ()>] = &[&c1, &c2];
+        let mut buf = [0u8; 32];
+        let err = fields.serialize_command(&mut buf).unwrap_err();
+        assert_eq!(SerializeError::MixedDescriptorSet, err);
     }
 }
