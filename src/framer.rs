@@ -198,7 +198,13 @@ impl MessageFramer {
             }
             ParseState::Length => {
                 buf[1] = b;
-                *state = ParseState::Payload(0);
+                if b != 0 {
+                    *state = ParseState::Payload(0);
+                } else {
+                    // If there are 0 payload bytes, go to expecting checksum
+                    *state = ParseState::CheckH;
+                }
+
                 Ok(None)
             }
             ParseState::Payload(i) => {
@@ -263,6 +269,33 @@ mod tests {
         let parsed = parsed.unwrap();
         assert_eq!(parsed.descriptor_set(), 0x10);
         assert_eq!(parsed.payload(), &count_payload);
+    }
+
+    #[test]
+    fn test_zero_length_payload_frame_bug() {
+        // A valid frame with descriptor set + zero-length payload + CRC.
+        let mut msg = crate::serialize::OwnedMessage::new(0x10);
+        let raw = msg.as_slice().to_vec();
+        let mut parser = MessageFramer::new();
+
+        let mut parsed_messages = Vec::new();
+        let mut frame_errors = Vec::new();
+
+        for b in raw {
+            match parser.push_byte(b) {
+                Ok(Some(m)) => parsed_messages.push(m.to_owned()),
+                Ok(None) => (),
+                Err(e @ (FrameError::CrcMismatch | FrameError::UnexpectedByte)) => {
+                    frame_errors.push(e)
+                }
+            }
+        }
+
+        // This should parse as one message with an empty payload.
+        assert_eq!(1, parsed_messages.len());
+        assert_eq!(0, frame_errors.len());
+        assert_eq!(0x10, parsed_messages[0].descriptor_set());
+        assert!(parsed_messages[0].payload().is_empty());
     }
 
     /// If an incorrect length is detected, it may consume multiple messages before reaching a CRC
