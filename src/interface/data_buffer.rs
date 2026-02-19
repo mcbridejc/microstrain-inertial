@@ -3,16 +3,28 @@ use bbqueue::{
     prod_cons::stream::StreamGrantR,
     traits::{coordination::cs::CsCoord, notifier::polling::Polling, storage::Inline},
 };
+use thiserror::Error;
 
 type Queue<const N: usize> = BBQueue<Inline<N>, CsCoord, Polling>;
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, Error, PartialEq, Eq)]
+/// Error returned by data buffer when pushing packets
 pub enum DataBufferError {
-    InvalidPacket,
+    /// Packet length field does not match data length
+    #[error("Packet length field does not match data length")]
+    InvalidPacketLength,
+    /// Packet is longer than the max allowed size
+    #[error("Packet is longer than the max allowed size")]
     PacketTooLarge,
+    /// There is not sufficient room in the buffer to store this packet
+    #[error("There is not sufficient room in the buffer to store this packet")]
     InsufficientSpace,
 }
 
+/// A FIFO for MIP packets
+///
+/// Creates a buffer out of N bytes to store MIP packet data, and allow reading them back in
+/// received order.
 pub struct DataBuffer<const N: usize> {
     queue: Queue<N>,
 }
@@ -24,12 +36,14 @@ impl<const N: usize> Default for DataBuffer<N> {
 }
 
 impl<const N: usize> DataBuffer<N> {
+    /// Create a new DataBuffer
     pub const fn new() -> Self {
         Self {
             queue: Queue::new(),
         }
     }
 
+    /// Push a packet into the buffer
     pub fn push_packet(&self, descriptor_set: u8, payload: &[u8]) -> Result<(), DataBufferError> {
         if payload.len() > u8::MAX as usize {
             return Err(DataBufferError::PacketTooLarge);
@@ -47,9 +61,10 @@ impl<const N: usize> DataBuffer<N> {
         Ok(())
     }
 
+    /// Push a packet into the buffer, in the form of raw bytes
     pub fn push_raw_packet(&self, packet: &[u8]) -> Result<(), DataBufferError> {
         if !is_valid_raw_packet(packet) {
-            return Err(DataBufferError::InvalidPacket);
+            return Err(DataBufferError::InvalidPacketLength);
         }
 
         let prod = self.queue.stream_producer();
@@ -61,6 +76,9 @@ impl<const N: usize> DataBuffer<N> {
         Ok(())
     }
 
+    /// Read the next packet from the buffer, if available
+    ///
+    /// Returns None if the buffer is empty.
     pub fn read_packet(&self) -> Option<DataPacketGuard<'_, N>> {
         let cons = self.queue.stream_consumer();
         let grant = cons.read().ok()?;
@@ -76,6 +94,7 @@ impl<const N: usize> DataBuffer<N> {
         })
     }
 
+    /// Check if at least one packet is waiting in the buffer
     pub fn is_packet_available(&self) -> bool {
         let cons = self.queue.stream_consumer();
         let grant = match cons.read() {
@@ -88,6 +107,7 @@ impl<const N: usize> DataBuffer<N> {
     }
 }
 
+/// A guard struct for returning packets from the buffer
 pub struct DataPacketGuard<'a, const N: usize> {
     grant: Option<StreamGrantR<&'a Queue<N>>>,
     bytes: usize,
@@ -109,14 +129,6 @@ impl<const N: usize> DataPacketGuard<'_, N> {
     /// Get the descriptor set for the packet
     pub fn descriptor_set(&self) -> u8 {
         self.as_slice()[0]
-    }
-
-    pub fn len(&self) -> usize {
-        self.bytes
-    }
-
-    pub fn is_empty(&self) -> bool {
-        self.bytes == 0
     }
 }
 

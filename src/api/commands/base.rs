@@ -1,6 +1,6 @@
 //! Base (0x01) commands
 //!
-
+#![allow(missing_docs)]
 use super::{BASE_DESCRIPTOR_SET, CommandField};
 use crate::{
     api::commands::{CommandResponseData, SerializeError},
@@ -152,9 +152,9 @@ impl CommandResponseData for DeviceDescriptorsResponse {
         }
 
         let mut descriptors = [0u16; 127];
-        for i in 0..count {
-            let b = 2 * i;
-            descriptors[i] = u16::from_be_bytes([data[b], data[b + 1]]);
+        for (i, d) in descriptors[..count].iter_mut().enumerate() {
+            let offset = 2 * i;
+            *d = u16::from_be_bytes([data[offset], data[offset + 1]]);
         }
 
         Ok(Self {

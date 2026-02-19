@@ -5,44 +5,24 @@ use core::sync::atomic::{AtomicBool, Ordering};
 use core::task::{Context, Poll, Waker};
 
 use critical_section::Mutex;
-use thiserror::Error;
 
 use crate::MAX_PACKET_SIZE;
 use crate::api::commands::base::Ping;
 use crate::api::commands::imu_3dm::{DescriptorRate, MessageFormat, MessageFormatResponse};
 use crate::api::commands::{
-    AckNack, CommandField, CommandResponse, CommandResponseData, CommandResponseIter,
-    CommandSerialize, SerializeError,
+    CommandField, CommandResponse, CommandResponseData, CommandResponseIter, CommandSerialize,
 };
 use crate::api::data::filter::FILTER_DESCRIPTOR_SET;
 use crate::api::data::sensor::SENSOR_DESCRIPTOR_SET;
 use crate::api::data::shared::SHARED_DESCRIPTOR_SET;
 use crate::api::data::system::SYSTEM_DESCRIPTOR_SET;
-use crate::errors::ParseError;
-use crate::framer::RawMessage;
-use crate::interface::{DataBuffer, DataBufferError, DataPacketGuard};
+use crate::framer::RawPacket;
+use crate::interface::{
+    CommandSendError, DataBuffer, DataBufferError, DataPacketGuard, ReadDataError,
+};
+
+/// The default size of the data buffer used by AsyncInterface
 pub const DEFAULT_DATA_BUFFER_SIZE: usize = 1024;
-
-#[derive(Clone, Copy, Debug, Error, PartialEq, Eq)]
-pub enum CommandSendError {
-    #[error("Command serialization failed")]
-    SerializeFailed(#[from] SerializeError),
-    #[error("An error occurred parsing the response to the command")]
-    ResponseParseError(#[from] ParseError),
-    #[error("Another command is still pending")]
-    CommandInProgress,
-    #[error("The received response did not match expectations")]
-    UnexpectedResponse,
-    #[error("The device returned a NACK")]
-    Nack(AckNack),
-}
-
-#[derive(Clone, Copy, Debug, Error, PartialEq, Eq)]
-#[cfg_attr(feature = "defmt", derive(defmt::Format))]
-pub enum ReadDataError {
-    #[error("data buffer overrun")]
-    Overrun,
-}
 
 enum CommandSlotState {
     Empty,
@@ -232,15 +212,22 @@ impl<const DATA_BUFFER_SIZE: usize> AsyncInterface<DATA_BUFFER_SIZE> {
         }
     }
 
+    /// Check if there is a data packet avialable.
     pub fn is_data_available(&self) -> bool {
         self.data_buffer.is_packet_available()
     }
 
+    /// Return a future to read data packets
+    ///
+    /// The future will pend until a data packet is available, at which point it will return a
+    /// Result with a [`DataPacketGuard`] on success, or an error to indicate that the data buffer
+    /// has been overrun and some data was lost.
     pub fn read_raw_data(&self) -> ReadRawDataFuture<'_, DATA_BUFFER_SIZE> {
         ReadRawDataFuture { interface: self }
     }
 
-    pub fn push_message(&self, msg: RawMessage) {
+    /// Push a message recieved from teh device to the interface for processing
+    pub fn push_message(&self, msg: RawPacket) {
         let descriptor_set = msg.descriptor_set();
 
         critical_section::with(|cs| {
@@ -258,7 +245,7 @@ impl<const DATA_BUFFER_SIZE: usize> AsyncInterface<DATA_BUFFER_SIZE> {
                     self.data_overrun.store(true, Ordering::Release);
                     self.wake_data_reader();
                 }
-                Err(DataBufferError::InvalidPacket) => {
+                Err(DataBufferError::InvalidPacketLength) => {
                     log::warn!(
                         "Dropped invalid data packet for descriptor set {descriptor_set:#04x}"
                     );
@@ -272,12 +259,18 @@ impl<const DATA_BUFFER_SIZE: usize> AsyncInterface<DATA_BUFFER_SIZE> {
         }
     }
 
+    /// Send a ping command to the device and await its response
     pub fn ping(
         &self,
     ) -> CommandResponseFuture<'_, <Ping as CommandField>::Response, DATA_BUFFER_SIZE> {
         self.send_command_field(&Ping {})
     }
 
+    /// Set the message format for the given descriptor set
+    ///
+    /// This specifies which data fields will be transmitted, and at what rate. Data fields will be
+    /// combined into a single packet, to the extend possible, but if too large, may extend into
+    /// multiple packets.
     pub fn set_message_format(
         &self,
         descriptor_set: u8,
@@ -295,6 +288,7 @@ impl<const DATA_BUFFER_SIZE: usize> AsyncInterface<DATA_BUFFER_SIZE> {
         CommandResponseFuture::new(self)
     }
 
+    /// Read transmit bytes ready to be sent by the interface
     pub fn read_outgoing_bytes(&self, buf: &mut [u8]) -> usize {
         critical_section::with(|cs| {
             let mut state = self.state.borrow_ref_mut(cs);
@@ -302,6 +296,13 @@ impl<const DATA_BUFFER_SIZE: usize> AsyncInterface<DATA_BUFFER_SIZE> {
         })
     }
 
+    /// Send an arbitrary command field, and get a future awaiting its response
+    ///
+    /// Any type which implements the [`CommandField`] trait can be sent as a command. The response
+    /// is parsed using the `C::Response` type, which must implement [`CommandResponseData`] to
+    /// parse the returned data. For commands which do not expect any returned data, this may be `()`.
+    ///
+    /// All commands will return an AckNack field.
     pub fn send_command_field<R, C>(
         &self,
         command: &C,
@@ -358,6 +359,7 @@ impl AsyncInterface<DEFAULT_DATA_BUFFER_SIZE> {
     }
 }
 
+/// A future for returning data packets
 pub struct ReadRawDataFuture<'a, const DATA_BUFFER_SIZE: usize> {
     interface: &'a AsyncInterface<DATA_BUFFER_SIZE>,
 }
@@ -390,6 +392,7 @@ impl<'a, const DATA_BUFFER_SIZE: usize> Future for ReadRawDataFuture<'a, DATA_BU
     }
 }
 
+/// Future to await the response to a command packet
 pub struct CommandResponseFuture<'a, R, const DATA_BUFFER_SIZE: usize> {
     interface: &'a AsyncInterface<DATA_BUFFER_SIZE>,
     done: bool,
@@ -397,7 +400,7 @@ pub struct CommandResponseFuture<'a, R, const DATA_BUFFER_SIZE: usize> {
 }
 
 impl<'a, R, const DATA_BUFFER_SIZE: usize> CommandResponseFuture<'a, R, DATA_BUFFER_SIZE> {
-    pub fn new(interface: &'a AsyncInterface<DATA_BUFFER_SIZE>) -> Self {
+    fn new(interface: &'a AsyncInterface<DATA_BUFFER_SIZE>) -> Self {
         Self {
             interface,
             done: false,

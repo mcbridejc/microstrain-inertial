@@ -7,8 +7,8 @@ pub mod sensor;
 pub mod shared;
 pub mod system;
 
-pub use crate::api::{parse::ReadBuf, types::*};
-pub use crate::errors::ParseError;
+use crate::api::{parse::ReadBuf, types::*};
+use crate::errors::ParseError;
 
 /// helper function for validating length
 #[inline]
@@ -25,6 +25,7 @@ fn ensure_len(buf: &&[u8], need: usize, descriptor: (u8, u8)) -> Result<(), Pars
 }
 
 /// Can represent all possible DATA packets
+#[allow(missing_docs)]
 pub enum DataPacket<'a> {
     SensorPacket(SensorPacket<'a>),
     FilterPacket(FilterPacket<'a>),

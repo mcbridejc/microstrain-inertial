@@ -7,10 +7,8 @@ use clap::Parser;
 use microstrain_inertial::{
     api::{
         commands::imu_3dm::DescriptorRate,
-        data::{
-            Vector3f,
-            sensor::{self, SensorField, SensorPacket},
-        },
+        data::sensor::{self, SensorField, SensorPacket},
+        types::Vector3f,
     },
     interface::AsyncInterface,
     serialport::start_serialport_thread,

@@ -6,13 +6,31 @@ use serial2::SerialPort;
 
 use crate::{framer::MessageFramer, interface::AsyncInterface};
 
+/// Start background IO threads for moving data into and out of an AsyncInterface
+///
+/// This is a convenience function, available with the `std` feature. It uses the `serial2` create
+/// to open an OS serial port.
+///
+/// # Example
+///
+/// ```ignore
+/// use std::sync::Arc;
+/// use microstrain_inertial::{
+///     interface::AsyncInterface,
+///     serialport::start_serialport_thread,
+/// };
+/// let interface = Arc::new(AsyncInterface::new());
+///
+/// // Create background serial port IO which will move data between the interface and serial port
+/// start_serialport_thread("/dev/ttyUSB0", 115200, interface.clone())
+///     .expect("Failed to launch IO thread");
+/// ```
 pub fn start_serialport_thread<const DATA_BUFFER_SIZE: usize>(
     port: &str,
     baud: u32,
     interface: Arc<AsyncInterface<DATA_BUFFER_SIZE>>,
 ) -> Result<(), std::io::Error> {
     let port = Arc::new(SerialPort::open(port, baud)?);
-
 
     let tx_if = interface.clone();
     let tx_port = port.clone();

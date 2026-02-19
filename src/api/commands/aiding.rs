@@ -1,5 +1,5 @@
 //! Aiding (0x13) commands.
-
+#![allow(missing_docs)]
 use super::base::FunctionSelector;
 use super::{AIDING_DESCRIPTOR_SET, CommandField, CommandResponseData, SerializeError};
 use crate::api::parse::ReadBuf as _;

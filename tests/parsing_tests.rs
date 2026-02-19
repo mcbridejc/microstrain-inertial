@@ -1,16 +1,14 @@
 use microstrain_inertial::{
     api::data::{
-        DataPacket, Quatf, Vector3f,
-        filter::{
-            AttitudeQuaternion, EulerAngles, FILTER_DESCRIPTOR_SET, FilterField, GyroBias,
-            ValidFlags,
-        },
+        DataPacket,
+        filter::{AttitudeQuaternion, EulerAngles, FILTER_DESCRIPTOR_SET, FilterField, GyroBias},
         sensor::{CompQuaternion, SENSOR_DESCRIPTOR_SET, ScaledAccel, SensorField},
         shared::{DeltaTime, GpsTimestamp, GpsTimestampValidFlags, SharedField},
     },
-    checksum::Checksum,
+    api::types::{Quatf, Vector3f},
+    checksum::calc_checksum,
     framer::MessageFramer,
-    serialize::OwnedMessage,
+    owned_packet::OwnedPacket,
 };
 
 const SYNC: [u8; 2] = [0x75, 0x65];
@@ -122,12 +120,12 @@ fn frame_payload(descriptor_set: u8, payload: &[u8]) -> Vec<u8> {
     frame.push(descriptor_set);
     frame.push(payload.len() as u8);
     frame.extend_from_slice(payload);
-    let crc = Checksum::calc_checksum(&frame);
+    let crc = calc_checksum(&frame);
     frame.extend_from_slice(&crc.to_be_bytes());
     frame
 }
 
-fn parse_bytes(parser: &mut MessageFramer, data: &[u8]) -> Vec<OwnedMessage> {
+fn parse_bytes(parser: &mut MessageFramer, data: &[u8]) -> Vec<OwnedPacket> {
     let mut frames = Vec::new();
     for b in data {
         match parser.push_byte(*b).unwrap() {
@@ -224,14 +222,14 @@ fn test_parsing_multiple_filter_fields() {
     assert_eq!(
         FilterField::AttitudeQuaternion(AttitudeQuaternion {
             q: Quatf::from_array(QUAT_VALUE),
-            valid_flags: ValidFlags(1),
+            valid_flags: 1,
         }),
         fields[0]
     );
     assert_eq!(
         FilterField::GyroBias(GyroBias {
             bias_rad_s: Vector3f::from_array(GYRO_BIAS_VALUE),
-            valid_flags: ValidFlags(1)
+            valid_flags: 1
         }),
         fields[1]
     );
@@ -240,7 +238,7 @@ fn test_parsing_multiple_filter_fields() {
             roll_rad: EULER_VALUES[0],
             pitch_rad: EULER_VALUES[1],
             yaw_rad: EULER_VALUES[2],
-            valid_flags: ValidFlags(1)
+            valid_flags: 1
         }),
         fields[2]
     );

@@ -1,21 +1,28 @@
-//! Filter descriptor set (0x82) data fields (full coverage).
-
+//! Filter descriptor set (0x82) data fields
+#![allow(missing_docs)]
 use super::{ReadBuf, ensure_len};
 use crate::api::data::{Matrix3f, Quatf, Vector3d, Vector3f, shared::SharedField};
 use crate::api::fields::{FieldIter, FieldParse};
 use crate::errors::ParseError;
 
+/// The descriptor set ID for FILTER data packets
 pub const FILTER_DESCRIPTOR_SET: u8 = 0x82;
 
+/// Wrapper struct for a filter packet buffer
 pub struct FilterPacket<'a> {
     payload: &'a [u8],
 }
 
 impl<'a> FilterPacket<'a> {
+    /// Create a new FilterPacket using the provided payload
+    ///
+    /// It is *assumed* that the payload is from a data message belonging to the `filter` descriptor
+    /// set, containing only filter fields.
     pub fn new(payload: &'a [u8]) -> Self {
         Self { payload }
     }
 
+    /// Get an iterator for the fields contained in the packet
     pub fn fields(&self) -> FieldIter<'a, FilterField> {
         FieldIter::new(self.payload)
     }
@@ -178,21 +185,6 @@ impl FieldParse for FilterField {
 // Typed bitfields / enums (kept “raw” where device-specific)
 // -------------------------
 
-#[derive(Debug, Copy, Clone, Eq, PartialEq)]
-pub struct ValidFlags(pub u16);
-
-#[derive(Debug, Copy, Clone, Eq, PartialEq)]
-pub struct StatusFlags(pub u16);
-
-#[derive(Debug, Copy, Clone, Eq, PartialEq)]
-pub struct AidingStatusFlags(pub u16);
-
-#[derive(Debug, Copy, Clone, Eq, PartialEq)]
-pub struct GnssDualAntennaStatusFlags(pub u16);
-
-#[derive(Debug, Copy, Clone, Eq, PartialEq)]
-pub struct AidingIndicatorFlags(pub u8);
-
 #[repr(u8)]
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]
 pub enum DualAntennaFixType {
@@ -223,7 +215,7 @@ pub struct LlhPosition {
     pub latitude_deg: f64,
     pub longitude_deg: f64,
     pub ellipsoid_height_m: f64,
-    pub valid_flags: ValidFlags,
+    pub valid_flags: u16,
 }
 impl LlhPosition {
     pub const DESCRIPTOR: u8 = 0x01;
@@ -236,7 +228,7 @@ impl LlhPosition {
             latitude_deg: b.read_f64(),
             longitude_deg: b.read_f64(),
             ellipsoid_height_m: b.read_f64(),
-            valid_flags: ValidFlags(b.read_u16()),
+            valid_flags: b.read_u16(),
         })
     }
 }
@@ -247,7 +239,7 @@ pub struct VelocityNed {
     pub north_m_s: f32,
     pub east_m_s: f32,
     pub down_m_s: f32,
-    pub valid_flags: ValidFlags,
+    pub valid_flags: u16,
 }
 impl VelocityNed {
     pub const DESCRIPTOR: u8 = 0x02;
@@ -260,7 +252,7 @@ impl VelocityNed {
             north_m_s: b.read_f32(),
             east_m_s: b.read_f32(),
             down_m_s: b.read_f32(),
-            valid_flags: ValidFlags(b.read_u16()),
+            valid_flags: b.read_u16(),
         })
     }
 }
@@ -269,7 +261,7 @@ impl VelocityNed {
 #[derive(Debug, Copy, Clone, PartialEq)]
 pub struct AttitudeQuaternion {
     pub q: Quatf,
-    pub valid_flags: ValidFlags,
+    pub valid_flags: u16,
 }
 impl AttitudeQuaternion {
     pub const DESCRIPTOR: u8 = 0x03;
@@ -280,7 +272,7 @@ impl AttitudeQuaternion {
         let mut b = bytes;
         Ok(Self {
             q: Quatf::read_from(&mut b, (FILTER_DESCRIPTOR_SET, Self::DESCRIPTOR))?,
-            valid_flags: ValidFlags(b.read_u16()),
+            valid_flags: b.read_u16(),
         })
     }
 }
@@ -289,7 +281,7 @@ impl AttitudeQuaternion {
 #[derive(Debug, Copy, Clone, PartialEq)]
 pub struct AttitudeDcm {
     pub dcm: Matrix3f,
-    pub valid_flags: ValidFlags,
+    pub valid_flags: u16,
 }
 impl AttitudeDcm {
     pub const DESCRIPTOR: u8 = 0x04;
@@ -300,7 +292,7 @@ impl AttitudeDcm {
         let mut b = bytes;
         Ok(Self {
             dcm: Matrix3f::read_from(&mut b, (FILTER_DESCRIPTOR_SET, Self::DESCRIPTOR))?,
-            valid_flags: ValidFlags(b.read_u16()),
+            valid_flags: b.read_u16(),
         })
     }
 }
@@ -311,7 +303,7 @@ pub struct EulerAngles {
     pub roll_rad: f32,
     pub pitch_rad: f32,
     pub yaw_rad: f32,
-    pub valid_flags: ValidFlags,
+    pub valid_flags: u16,
 }
 impl EulerAngles {
     pub const DESCRIPTOR: u8 = 0x05;
@@ -324,7 +316,7 @@ impl EulerAngles {
             roll_rad: b.read_f32(),
             pitch_rad: b.read_f32(),
             yaw_rad: b.read_f32(),
-            valid_flags: ValidFlags(b.read_u16()),
+            valid_flags: b.read_u16(),
         })
     }
 }
@@ -333,7 +325,7 @@ impl EulerAngles {
 #[derive(Debug, Copy, Clone, PartialEq)]
 pub struct GyroBias {
     pub bias_rad_s: Vector3f,
-    pub valid_flags: ValidFlags,
+    pub valid_flags: u16,
 }
 impl GyroBias {
     pub const DESCRIPTOR: u8 = 0x06;
@@ -344,7 +336,7 @@ impl GyroBias {
         let mut b = bytes;
         Ok(Self {
             bias_rad_s: Vector3f::read_from(&mut b, (FILTER_DESCRIPTOR_SET, Self::DESCRIPTOR))?,
-            valid_flags: ValidFlags(b.read_u16()),
+            valid_flags: b.read_u16(),
         })
     }
 }
@@ -353,7 +345,7 @@ impl GyroBias {
 #[derive(Debug, Copy, Clone, PartialEq)]
 pub struct AccelBias {
     pub bias_m_s2: Vector3f,
-    pub valid_flags: ValidFlags,
+    pub valid_flags: u16,
 }
 impl AccelBias {
     pub const DESCRIPTOR: u8 = 0x07;
@@ -364,7 +356,7 @@ impl AccelBias {
         let mut b = bytes;
         Ok(Self {
             bias_m_s2: Vector3f::read_from(&mut b, (FILTER_DESCRIPTOR_SET, Self::DESCRIPTOR))?,
-            valid_flags: ValidFlags(b.read_u16()),
+            valid_flags: b.read_u16(),
         })
     }
 }
@@ -375,7 +367,7 @@ pub struct LlhPositionUncertainty {
     pub north_m: f32,
     pub east_m: f32,
     pub down_m: f32,
-    pub valid_flags: ValidFlags,
+    pub valid_flags: u16,
 }
 impl LlhPositionUncertainty {
     pub const DESCRIPTOR: u8 = 0x08;
@@ -388,7 +380,7 @@ impl LlhPositionUncertainty {
             north_m: b.read_f32(),
             east_m: b.read_f32(),
             down_m: b.read_f32(),
-            valid_flags: ValidFlags(b.read_u16()),
+            valid_flags: b.read_u16(),
         })
     }
 }
@@ -399,7 +391,7 @@ pub struct NedVelocityUncertainty {
     pub north_m_s: f32,
     pub east_m_s: f32,
     pub down_m_s: f32,
-    pub valid_flags: ValidFlags,
+    pub valid_flags: u16,
 }
 impl NedVelocityUncertainty {
     pub const DESCRIPTOR: u8 = 0x09;
@@ -412,7 +404,7 @@ impl NedVelocityUncertainty {
             north_m_s: b.read_f32(),
             east_m_s: b.read_f32(),
             down_m_s: b.read_f32(),
-            valid_flags: ValidFlags(b.read_u16()),
+            valid_flags: b.read_u16(),
         })
     }
 }
@@ -423,7 +415,7 @@ pub struct EulerAnglesUncertainty {
     pub roll_rad: f32,
     pub pitch_rad: f32,
     pub yaw_rad: f32,
-    pub valid_flags: ValidFlags,
+    pub valid_flags: u16,
 }
 impl EulerAnglesUncertainty {
     pub const DESCRIPTOR: u8 = 0x0A;
@@ -436,7 +428,7 @@ impl EulerAnglesUncertainty {
             roll_rad: b.read_f32(),
             pitch_rad: b.read_f32(),
             yaw_rad: b.read_f32(),
-            valid_flags: ValidFlags(b.read_u16()),
+            valid_flags: b.read_u16(),
         })
     }
 }
@@ -445,7 +437,7 @@ impl EulerAnglesUncertainty {
 #[derive(Debug, Copy, Clone, PartialEq)]
 pub struct GyroBiasUncertainty {
     pub bias_uncert_rad_s: Vector3f,
-    pub valid_flags: ValidFlags,
+    pub valid_flags: u16,
 }
 impl GyroBiasUncertainty {
     pub const DESCRIPTOR: u8 = 0x0B;
@@ -459,7 +451,7 @@ impl GyroBiasUncertainty {
                 &mut b,
                 (FILTER_DESCRIPTOR_SET, Self::DESCRIPTOR),
             )?,
-            valid_flags: ValidFlags(b.read_u16()),
+            valid_flags: b.read_u16(),
         })
     }
 }
@@ -468,7 +460,7 @@ impl GyroBiasUncertainty {
 #[derive(Debug, Copy, Clone, PartialEq)]
 pub struct AccelBiasUncertainty {
     pub bias_uncert_m_s2: Vector3f,
-    pub valid_flags: ValidFlags,
+    pub valid_flags: u16,
 }
 impl AccelBiasUncertainty {
     pub const DESCRIPTOR: u8 = 0x0C;
@@ -482,7 +474,7 @@ impl AccelBiasUncertainty {
                 &mut b,
                 (FILTER_DESCRIPTOR_SET, Self::DESCRIPTOR),
             )?,
-            valid_flags: ValidFlags(b.read_u16()),
+            valid_flags: b.read_u16(),
         })
     }
 }
@@ -491,7 +483,7 @@ impl AccelBiasUncertainty {
 #[derive(Debug, Copy, Clone, PartialEq)]
 pub struct LinearAccel {
     pub accel_m_s2: Vector3f,
-    pub valid_flags: ValidFlags,
+    pub valid_flags: u16,
 }
 impl LinearAccel {
     pub const DESCRIPTOR: u8 = 0x0D;
@@ -502,7 +494,7 @@ impl LinearAccel {
         let mut b = bytes;
         Ok(Self {
             accel_m_s2: Vector3f::read_from(&mut b, (FILTER_DESCRIPTOR_SET, Self::DESCRIPTOR))?,
-            valid_flags: ValidFlags(b.read_u16()),
+            valid_flags: b.read_u16(),
         })
     }
 }
@@ -511,7 +503,7 @@ impl LinearAccel {
 #[derive(Debug, Copy, Clone, PartialEq)]
 pub struct CompAngularRate {
     pub gyro_rad_s: Vector3f,
-    pub valid_flags: ValidFlags,
+    pub valid_flags: u16,
 }
 impl CompAngularRate {
     pub const DESCRIPTOR: u8 = 0x0E;
@@ -522,7 +514,7 @@ impl CompAngularRate {
         let mut b = bytes;
         Ok(Self {
             gyro_rad_s: Vector3f::read_from(&mut b, (FILTER_DESCRIPTOR_SET, Self::DESCRIPTOR))?,
-            valid_flags: ValidFlags(b.read_u16()),
+            valid_flags: b.read_u16(),
         })
     }
 }
@@ -532,7 +524,7 @@ impl CompAngularRate {
 pub struct Status {
     pub filter_state: u16,
     pub dynamics_mode: u16,
-    pub status_flags: StatusFlags,
+    pub status_flags: u16,
 }
 impl Status {
     pub const DESCRIPTOR: u8 = 0x10;
@@ -544,7 +536,7 @@ impl Status {
         Ok(Self {
             filter_state: b.read_u16(),
             dynamics_mode: b.read_u16(),
-            status_flags: StatusFlags(b.read_u16()),
+            status_flags: b.read_u16(),
         })
     }
 }
@@ -554,7 +546,7 @@ impl Status {
 pub struct Timestamp {
     pub tow_s: f64,
     pub week_number: u16,
-    pub valid_flags: ValidFlags,
+    pub valid_flags: u16,
 }
 impl Timestamp {
     pub const DESCRIPTOR: u8 = 0x11;
@@ -566,7 +558,7 @@ impl Timestamp {
         Ok(Self {
             tow_s: b.read_f64(),
             week_number: b.read_u16(),
-            valid_flags: ValidFlags(b.read_u16()),
+            valid_flags: b.read_u16(),
         })
     }
 }
@@ -575,7 +567,7 @@ impl Timestamp {
 #[derive(Debug, Copy, Clone, PartialEq)]
 pub struct QuaternionAttitudeUncertainty {
     pub q: Quatf,
-    pub valid_flags: ValidFlags,
+    pub valid_flags: u16,
 }
 impl QuaternionAttitudeUncertainty {
     pub const DESCRIPTOR: u8 = 0x12;
@@ -586,7 +578,7 @@ impl QuaternionAttitudeUncertainty {
         let mut b = bytes;
         Ok(Self {
             q: Quatf::read_from(&mut b, (FILTER_DESCRIPTOR_SET, Self::DESCRIPTOR))?,
-            valid_flags: ValidFlags(b.read_u16()),
+            valid_flags: b.read_u16(),
         })
     }
 }
@@ -595,7 +587,7 @@ impl QuaternionAttitudeUncertainty {
 #[derive(Debug, Copy, Clone, PartialEq)]
 pub struct GravityVector {
     pub gravity_m_s2: Vector3f,
-    pub valid_flags: ValidFlags,
+    pub valid_flags: u16,
 }
 impl GravityVector {
     pub const DESCRIPTOR: u8 = 0x13;
@@ -606,7 +598,7 @@ impl GravityVector {
         let mut b = bytes;
         Ok(Self {
             gravity_m_s2: Vector3f::read_from(&mut b, (FILTER_DESCRIPTOR_SET, Self::DESCRIPTOR))?,
-            valid_flags: ValidFlags(b.read_u16()),
+            valid_flags: b.read_u16(),
         })
     }
 }
@@ -619,7 +611,7 @@ pub struct MagneticModel {
     pub intensity_down_gauss: f32,
     pub inclination_rad: f32,
     pub declination_rad: f32,
-    pub valid_flags: ValidFlags,
+    pub valid_flags: u16,
 }
 impl MagneticModel {
     pub const DESCRIPTOR: u8 = 0x15;
@@ -634,7 +626,7 @@ impl MagneticModel {
             intensity_down_gauss: b.read_f32(),
             inclination_rad: b.read_f32(),
             declination_rad: b.read_f32(),
-            valid_flags: ValidFlags(b.read_u16()),
+            valid_flags: b.read_u16(),
         })
     }
 }
@@ -643,7 +635,7 @@ impl MagneticModel {
 #[derive(Debug, Copy, Clone, PartialEq)]
 pub struct CompensatedAcceleration {
     pub accel_m_s2: Vector3f,
-    pub valid_flags: ValidFlags,
+    pub valid_flags: u16,
 }
 impl CompensatedAcceleration {
     pub const DESCRIPTOR: u8 = 0x1C;
@@ -654,7 +646,7 @@ impl CompensatedAcceleration {
         let mut b = bytes;
         Ok(Self {
             accel_m_s2: Vector3f::read_from(&mut b, (FILTER_DESCRIPTOR_SET, Self::DESCRIPTOR))?,
-            valid_flags: ValidFlags(b.read_u16()),
+            valid_flags: b.read_u16(),
         })
     }
 }
@@ -663,7 +655,7 @@ impl CompensatedAcceleration {
 #[derive(Debug, Copy, Clone, PartialEq)]
 pub struct PressureAltitude {
     pub pressure_altitude_m: f32,
-    pub valid_flags: ValidFlags,
+    pub valid_flags: u16,
 }
 impl PressureAltitude {
     pub const DESCRIPTOR: u8 = 0x21;
@@ -674,7 +666,7 @@ impl PressureAltitude {
         let mut b = bytes;
         Ok(Self {
             pressure_altitude_m: b.read_f32(),
-            valid_flags: ValidFlags(b.read_u16()),
+            valid_flags: b.read_u16(),
         })
     }
 }
@@ -684,7 +676,7 @@ impl PressureAltitude {
 pub struct MultiAntennaOffsetCorrection {
     pub receiver_id: u8,
     pub offset_m: Vector3f,
-    pub valid_flags: ValidFlags,
+    pub valid_flags: u16,
 }
 impl MultiAntennaOffsetCorrection {
     pub const DESCRIPTOR: u8 = 0x34;
@@ -696,7 +688,7 @@ impl MultiAntennaOffsetCorrection {
         Ok(Self {
             receiver_id: b.read_u8(),
             offset_m: Vector3f::read_from(&mut b, (FILTER_DESCRIPTOR_SET, Self::DESCRIPTOR))?,
-            valid_flags: ValidFlags(b.read_u16()),
+            valid_flags: b.read_u16(),
         })
     }
 }
@@ -706,7 +698,7 @@ impl MultiAntennaOffsetCorrection {
 pub struct MultiAntennaOffsetCorrectionUncertainty {
     pub receiver_id: u8,
     pub offset_uncert_m: Vector3f,
-    pub valid_flags: ValidFlags,
+    pub valid_flags: u16,
 }
 impl MultiAntennaOffsetCorrectionUncertainty {
     pub const DESCRIPTOR: u8 = 0x35;
@@ -721,7 +713,7 @@ impl MultiAntennaOffsetCorrectionUncertainty {
                 &mut b,
                 (FILTER_DESCRIPTOR_SET, Self::DESCRIPTOR),
             )?,
-            valid_flags: ValidFlags(b.read_u16()),
+            valid_flags: b.read_u16(),
         })
     }
 }
@@ -730,7 +722,7 @@ impl MultiAntennaOffsetCorrectionUncertainty {
 #[derive(Debug, Copy, Clone, PartialEq)]
 pub struct EcefPositionUncertainty {
     pub pos_uncert_m: Vector3f,
-    pub valid_flags: ValidFlags,
+    pub valid_flags: u16,
 }
 impl EcefPositionUncertainty {
     pub const DESCRIPTOR: u8 = 0x36;
@@ -741,7 +733,7 @@ impl EcefPositionUncertainty {
         let mut b = bytes;
         Ok(Self {
             pos_uncert_m: Vector3f::read_from(&mut b, (FILTER_DESCRIPTOR_SET, Self::DESCRIPTOR))?,
-            valid_flags: ValidFlags(b.read_u16()),
+            valid_flags: b.read_u16(),
         })
     }
 }
@@ -750,7 +742,7 @@ impl EcefPositionUncertainty {
 #[derive(Debug, Copy, Clone, PartialEq)]
 pub struct EcefVelocityUncertainty {
     pub vel_uncert_m_s: Vector3f,
-    pub valid_flags: ValidFlags,
+    pub valid_flags: u16,
 }
 impl EcefVelocityUncertainty {
     pub const DESCRIPTOR: u8 = 0x37;
@@ -761,7 +753,7 @@ impl EcefVelocityUncertainty {
         let mut b = bytes;
         Ok(Self {
             vel_uncert_m_s: Vector3f::read_from(&mut b, (FILTER_DESCRIPTOR_SET, Self::DESCRIPTOR))?,
-            valid_flags: ValidFlags(b.read_u16()),
+            valid_flags: b.read_u16(),
         })
     }
 }
@@ -770,7 +762,7 @@ impl EcefVelocityUncertainty {
 #[derive(Debug, Copy, Clone, PartialEq)]
 pub struct EcefPosition {
     pub position_ecef_m: Vector3d,
-    pub valid_flags: ValidFlags,
+    pub valid_flags: u16,
 }
 impl EcefPosition {
     pub const DESCRIPTOR: u8 = 0x40;
@@ -784,7 +776,7 @@ impl EcefPosition {
                 &mut b,
                 (FILTER_DESCRIPTOR_SET, Self::DESCRIPTOR),
             )?,
-            valid_flags: ValidFlags(b.read_u16()),
+            valid_flags: b.read_u16(),
         })
     }
 }
@@ -793,7 +785,7 @@ impl EcefPosition {
 #[derive(Debug, Copy, Clone, PartialEq)]
 pub struct EcefVelocity {
     pub velocity_ecef_m_s: Vector3f,
-    pub valid_flags: ValidFlags,
+    pub valid_flags: u16,
 }
 impl EcefVelocity {
     pub const DESCRIPTOR: u8 = 0x41;
@@ -807,7 +799,7 @@ impl EcefVelocity {
                 &mut b,
                 (FILTER_DESCRIPTOR_SET, Self::DESCRIPTOR),
             )?,
-            valid_flags: ValidFlags(b.read_u16()),
+            valid_flags: b.read_u16(),
         })
     }
 }
@@ -816,7 +808,7 @@ impl EcefVelocity {
 #[derive(Debug, Copy, Clone, PartialEq)]
 pub struct NedRelativePosition {
     pub relative_position_ned_m: Vector3d,
-    pub valid_flags: ValidFlags,
+    pub valid_flags: u16,
 }
 impl NedRelativePosition {
     pub const DESCRIPTOR: u8 = 0x42;
@@ -830,7 +822,7 @@ impl NedRelativePosition {
                 &mut b,
                 (FILTER_DESCRIPTOR_SET, Self::DESCRIPTOR),
             )?,
-            valid_flags: ValidFlags(b.read_u16()),
+            valid_flags: b.read_u16(),
         })
     }
 }
@@ -840,7 +832,7 @@ impl NedRelativePosition {
 pub struct GnssPositionAidingStatus {
     pub receiver_id: u8,
     pub time_of_week_s: f32,
-    pub status: AidingStatusFlags,
+    pub status: u16,
     pub reserved: [u8; 8],
 }
 impl GnssPositionAidingStatus {
@@ -853,7 +845,7 @@ impl GnssPositionAidingStatus {
         Ok(Self {
             receiver_id: b.read_u8(),
             time_of_week_s: b.read_f32(),
-            status: AidingStatusFlags(b.read_u16()),
+            status: b.read_u16(),
             reserved: b.read_bytes::<8>(),
         })
     }
@@ -865,7 +857,7 @@ pub struct AidingMeasurementSummary {
     pub time_of_week_s: f32,
     pub source: u8,
     pub aiding_type: u8,
-    pub indicator: AidingIndicatorFlags,
+    pub indicator: u8,
 }
 impl AidingMeasurementSummary {
     pub const DESCRIPTOR: u8 = 0x46;
@@ -878,7 +870,7 @@ impl AidingMeasurementSummary {
             time_of_week_s: b.read_f32(),
             source: b.read_u8(),
             aiding_type: b.read_u8(),
-            indicator: AidingIndicatorFlags(b.read_u8()),
+            indicator: b.read_u8(),
         })
     }
 }
@@ -887,7 +879,7 @@ impl AidingMeasurementSummary {
 #[derive(Debug, Copy, Clone, PartialEq)]
 pub struct OdometerScaleFactorError {
     pub scale_factor_error: f32,
-    pub valid_flags: ValidFlags,
+    pub valid_flags: u16,
 }
 impl OdometerScaleFactorError {
     pub const DESCRIPTOR: u8 = 0x47;
@@ -898,7 +890,7 @@ impl OdometerScaleFactorError {
         let mut b = bytes;
         Ok(Self {
             scale_factor_error: b.read_f32(),
-            valid_flags: ValidFlags(b.read_u16()),
+            valid_flags: b.read_u16(),
         })
     }
 }
@@ -907,7 +899,7 @@ impl OdometerScaleFactorError {
 #[derive(Debug, Copy, Clone, PartialEq)]
 pub struct OdometerScaleFactorErrorUncertainty {
     pub scale_factor_error_uncertainty: f32,
-    pub valid_flags: ValidFlags,
+    pub valid_flags: u16,
 }
 impl OdometerScaleFactorErrorUncertainty {
     pub const DESCRIPTOR: u8 = 0x48;
@@ -918,7 +910,7 @@ impl OdometerScaleFactorErrorUncertainty {
         let mut b = bytes;
         Ok(Self {
             scale_factor_error_uncertainty: b.read_f32(),
-            valid_flags: ValidFlags(b.read_u16()),
+            valid_flags: b.read_u16(),
         })
     }
 }
@@ -930,8 +922,8 @@ pub struct GnssDualAntennaStatus {
     pub heading_rad: f32,
     pub heading_unc_rad: f32,
     pub fix_type: DualAntennaFixType,
-    pub status_flags: GnssDualAntennaStatusFlags,
-    pub valid_flags: ValidFlags,
+    pub status_flags: u16,
+    pub valid_flags: u16,
 }
 impl GnssDualAntennaStatus {
     pub const DESCRIPTOR: u8 = 0x49;
@@ -945,8 +937,8 @@ impl GnssDualAntennaStatus {
             heading_rad: b.read_f32(),
             heading_unc_rad: b.read_f32(),
             fix_type: DualAntennaFixType::from_u8(b.read_u8()),
-            status_flags: GnssDualAntennaStatusFlags(b.read_u16()),
-            valid_flags: ValidFlags(b.read_u16()),
+            status_flags: b.read_u16(),
+            valid_flags: b.read_u16(),
         })
     }
 }

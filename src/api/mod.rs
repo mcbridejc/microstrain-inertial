@@ -12,6 +12,6 @@
 
 pub mod commands;
 pub mod data;
-pub mod fields;
-pub mod parse;
+mod fields;
+mod parse;
 pub mod types;

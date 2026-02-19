@@ -1,5 +1,5 @@
 //! Filter (0x0D) commands.
-
+#![allow(missing_docs)]
 use crate::api::{parse::ReadBuf as _, types::Vector3f};
 use crate::errors::ParseError;
 

@@ -8,10 +8,10 @@ use microstrain_inertial::{
     api::{
         commands::imu_3dm::DescriptorRate,
         data::{
-            Quatf, Vector3f,
             filter::{self, FILTER_DESCRIPTOR_SET, FilterField, FilterPacket},
             sensor,
         },
+        types::{Quatf, Vector3f},
     },
     interface::AsyncInterface,
     serialport::start_serialport_thread,

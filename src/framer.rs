@@ -1,36 +1,87 @@
 //! MIP Packet Framer/Parser
-use crate::{checksum::Checksum, errors::FrameError, serialize::OwnedMessage};
+use crate::{checksum::Checksum, errors::FrameError, owned_packet::OwnedPacket};
 
 const MAX_PAYLOAD: usize = 255;
 
 #[allow(clippy::len_without_is_empty)]
 #[derive(Clone, Copy, Debug, PartialEq)]
-pub struct RawMessage<'a> {
+/// Wrapper for a MIP packet buffer
+pub struct RawPacket<'a> {
     buf: &'a [u8],
 }
 
-impl<'a> RawMessage<'a> {
+impl<'a> RawPacket<'a> {
+    /// Create a new raw message from a packet buffer
+    ///
+    /// `buf` should not include SYNC bytes and must have a valid length field which matches the
+    /// size of the slice.
     pub fn new(buf: &'a [u8]) -> Self {
         Self { buf }
     }
 
+    /// Return the payload of the packet
     pub fn payload(&self) -> &[u8] {
-        &self.buf[2..2 + self.len() as usize]
+        let end = (2 + self.len() as usize).min(self.buf.len());
+        &self.buf[2..end]
     }
 
+    /// Return the descriptor set for the packet
     pub fn descriptor_set(&self) -> u8 {
         self.buf[0]
     }
 
+    /// Get the payload length as encoded in the packet
     pub fn len(&self) -> u8 {
         self.buf[1]
     }
 
-    pub fn to_owned(&self) -> OwnedMessage {
-        OwnedMessage::new_with_payload(self.descriptor_set(), self.payload())
+    /// Convert the message into an OwnedMessage
+    pub fn to_owned(&self) -> OwnedPacket {
+        OwnedPacket::new_with_payload(self.descriptor_set(), self.payload())
     }
 }
 
+/// Parse incoming stream of bytes into MIP packets
+///
+/// Messages are transmitted with two sync bytes, a descriptor set byte, and a payload length byte
+/// as header, following by the payload, following by two checksum bytes:
+///
+/// `<SYNC1> <SYNC2> <DESCRIPTOR_SET> <PAYLOAD_LEN(N)> <N payload bytes> <CHK_H> <CHK_L>`
+///  
+/// The framer searches for sync bytes, and when found parses the remaining bytes as a message. If a
+/// CRC mismatch occurs, the parser will rewind and resume parsing one byte later than the previous
+/// start, attempting again to find a valid packet.
+///
+/// When a rewind occurs due to malformed input, it is possible that when
+/// [`push_byte`](Self::push_byte) returns a completed packet there remain more packets ready in the
+/// un-parsed data buffer. If so, this packet will be returned on the next call to
+/// [`push_byte`](Self::push_byte). In order to process these packets immediately, uses can call
+/// [`try_pending_message`](Self::try_pending_message).
+///
+/// # Example
+///
+/// ```rust
+/// use microstrain_inertial::{
+///     framer::MessageFramer,
+///     SYNC1, SYNC2,
+/// };
+///
+/// let mut framer = MessageFramer::new();
+/// let msg = [SYNC1, SYNC2, 10, 3, 1, 2, 3];
+/// let crc = microstrain_inertial::checksum::calc_checksum(&msg);
+///
+/// for b in &msg {
+///     let result = framer.push_byte(*b).expect("Error parsing byte");
+///     assert!(result.is_none()); // No packet was completed
+/// }
+/// framer.push_byte((crc >> 8) as u8);
+/// // Send last byte of frame, get back RawPacket
+/// let frame = framer.push_byte(crc as u8).expect("Error parsing byte").expect("No packet was completed");
+/// assert_eq!(10, frame.descriptor_set());
+/// assert_eq!(&[1,2,3], frame.payload());
+///
+/// ```
+///
 pub struct MessageFramer {
     buf: [u8; MAX_PAYLOAD + 5],
     state: ParseState,
@@ -58,6 +109,7 @@ impl MessageFramer {
     const SYNC1: u8 = 0x75;
     const SYNC2: u8 = 0x65;
 
+    /// Create a new MessageFramer
     pub const fn new() -> Self {
         Self {
             buf: [0; MAX_PAYLOAD + 5],
@@ -121,8 +173,8 @@ impl MessageFramer {
     /// until either a valid message is found or all pending bytes are consumed. Once None is
     /// returned by this message, no valid message can be return until `push_byte` is called to
     /// deliver more bytes to the parser.
-    pub fn try_pending_message(&mut self) -> Option<RawMessage<'_>> {
-        self.consume_pending().map(|len| RawMessage {
+    pub fn try_pending_message(&mut self) -> Option<RawPacket<'_>> {
+        self.consume_pending().map(|len| RawPacket {
             buf: &self.buf[..len],
         })
     }
@@ -136,7 +188,7 @@ impl MessageFramer {
     /// descriptor_set byte on the next call to push_byte. However, in order to read pending
     /// messages immediately without receiving a new byte, one can call
     /// [`MessageFramer::try_pending_message`].
-    pub fn push_byte(&mut self, b: u8) -> Result<Option<RawMessage<'_>>, FrameError> {
+    pub fn push_byte(&mut self, b: u8) -> Result<Option<RawPacket<'_>>, FrameError> {
         if self.pending_bytes.is_some() {
             if let Some(len) = self.consume_pending() {
                 // We found a message in the pending bytes.
@@ -148,7 +200,7 @@ impl MessageFramer {
                     self.buf[0] = b;
                     self.pending_bytes = Some((0, 1));
                 }
-                return Ok(Some(RawMessage {
+                return Ok(Some(RawPacket {
                     buf: &self.buf[..len],
                 }));
             } else {
@@ -158,7 +210,7 @@ impl MessageFramer {
         }
 
         match Self::push_byte_inner(&mut self.state, &mut self.buf, &mut self.pending_bytes, b) {
-            Ok(Some(len)) => Ok(Some(RawMessage {
+            Ok(Some(len)) => Ok(Some(RawPacket {
                 buf: &self.buf[0..len],
             })),
             Ok(None) => Ok(None),
@@ -254,7 +306,7 @@ mod tests {
     #[test]
     fn test_parse_message() {
         let count_payload: Vec<u8> = (0u8..32).collect();
-        let mut msg = crate::serialize::OwnedMessage::new_with_payload(0x10, &count_payload);
+        let mut msg = crate::owned_packet::OwnedPacket::new_with_payload(0x10, &count_payload);
         let mut parser = MessageFramer::new();
 
         let mut parsed = None;
@@ -274,7 +326,7 @@ mod tests {
     #[test]
     fn test_zero_length_payload_frame_bug() {
         // A valid frame with descriptor set + zero-length payload + CRC.
-        let mut msg = crate::serialize::OwnedMessage::new(0x10);
+        let mut msg = crate::owned_packet::OwnedPacket::new(0x10);
         let raw = msg.as_slice().to_vec();
         let mut parser = MessageFramer::new();
 
@@ -303,9 +355,9 @@ mod tests {
     #[test]
     fn test_double_message_after_failure() {
         let count_payload: Vec<u8> = (0u8..255).collect();
-        let msg1 = crate::serialize::OwnedMessage::new_with_payload(0x10, &count_payload[0..4]);
-        let msg2 = crate::serialize::OwnedMessage::new_with_payload(0x20, &count_payload[0..8]);
-        let msg3 = crate::serialize::OwnedMessage::new_with_payload(0x30, &count_payload);
+        let msg1 = crate::owned_packet::OwnedPacket::new_with_payload(0x10, &count_payload[0..4]);
+        let msg2 = crate::owned_packet::OwnedPacket::new_with_payload(0x20, &count_payload[0..8]);
+        let msg3 = crate::owned_packet::OwnedPacket::new_with_payload(0x30, &count_payload);
         let mut parser = MessageFramer::new();
         // Intentially break the parser by making it expect as 128 byte message
         assert_eq!(Ok(None), parser.push_byte(0x75)); // SYNC1

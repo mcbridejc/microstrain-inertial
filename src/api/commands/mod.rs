@@ -26,6 +26,7 @@ pub const ACKNACK_DESCRIPTOR: u8 = 0xF1;
 /// Enum of possible AckNack reply code values
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 #[repr(u8)]
+#[allow(missing_docs)]
 pub enum AckNack {
     Ack = 0,
     UnknownCommand = 1,
@@ -40,10 +41,7 @@ pub enum AckNack {
 impl AckNack {
     /// Returns true if the acknack value indicates ack/succcess, and false if it is any other value
     pub fn is_ack(&self) -> bool {
-        match self {
-            Self::Ack => true,
-            _ => false,
-        }
+        matches!(self, Self::Ack)
     }
 }
 
@@ -65,6 +63,9 @@ impl From<u8> for AckNack {
 
 /// A trait for command resposne data structs to implement
 pub trait CommandResponseData: Copy + core::fmt::Debug {
+    /// Create a response struct from the field data bytes
+    ///
+    /// `data` should not include the descriptor or field length bytes.
     fn from_data(data: &[u8]) -> Result<Self, ParseError>
     where
         Self: Sized;
@@ -80,6 +81,10 @@ impl CommandResponseData for () {
 
 /// A trait for command fields to implement for serialization
 pub trait CommandField {
+    /// Specifies a type which is used to parse command response data
+    ///
+    /// This type should be set to `()` for commands which do not expect any data beyond the AckNack
+    /// field.
     type Response: CommandResponseData;
 
     /// Returns the descriptor set this command belongs to'
@@ -129,7 +134,12 @@ pub struct CommandResponse<R: Clone + Copy + core::fmt::Debug> {
 /// We know the format of the acknack field, but the second (optional) data field cannot be
 /// interpreted at this point because it varies by command.
 pub struct GenericCommandResponse<'a> {
+    /// The acknack value received for the command
     pub acknack: AckNack,
+    /// The payload for the response field, if one was provided
+    ///
+    /// This is the data for the field immediate after the acknack. It does not contain the
+    /// descriptor, or the length bytes.
     pub data: Option<&'a [u8]>,
 }
 
@@ -224,10 +234,13 @@ impl<'a> Iterator for CommandResponseIter<'a> {
 /// An error which occurs while serializing command packets
 #[derive(Clone, Copy, Debug, Error, PartialEq, Eq)]
 pub enum SerializeError {
+    /// The provided write buffer was too short
     #[error("The provided write buffer was too short")]
     OutOfSpace,
+    /// Cannot combine commands from different descriptor sets into one packet
     #[error("Cannot combine commands from different descriptor sets into one packet")]
     MixedDescriptorSet,
+    /// Cannot send a command with no fields
     #[error("Cannot send a command with no fields")]
     ZeroFields,
 }
@@ -238,6 +251,7 @@ pub trait CommandSerialize {
     /// should be written to the buffer.
     fn serialize_command(&self, buf: &mut [u8]) -> Result<usize, SerializeError>;
 
+    /// Get the descriptor set for this command
     fn descriptor_set(&self) -> u8;
 }
 

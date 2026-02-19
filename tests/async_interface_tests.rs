@@ -4,7 +4,7 @@ use core::task::{Context, Poll, Waker};
 
 use microstrain_inertial::api::commands::base::Ping;
 use microstrain_inertial::api::commands::{AckNack, CommandSerialize};
-use microstrain_inertial::framer::RawMessage;
+use microstrain_inertial::framer::RawPacket;
 use microstrain_inertial::interface::ReadDataError;
 
 #[test]
@@ -30,7 +30,7 @@ fn test_ping_command() {
 
     // Send back the ping response
     let ping_resp = [1, 4, 4, 241, 1, 0];
-    interface.push_message(RawMessage::new(&ping_resp));
+    interface.push_message(RawPacket::new(&ping_resp));
 
     // Poll the future again, this time it should have completed successfully
     let poll_result = future.poll(&mut cx);
@@ -49,7 +49,7 @@ fn test_read_raw_data() {
     assert!(!interface.is_data_available());
 
     let msg = [0x80, 4, 2, 0x04, 0xAA, 0xBB];
-    interface.push_message(RawMessage::new(&msg));
+    interface.push_message(RawPacket::new(&msg));
     assert!(interface.is_data_available());
 
     let mut future = pin!(interface.read_raw_data());
@@ -70,8 +70,8 @@ fn test_read_raw_data_overrun() {
         microstrain_inertial::interface::AsyncInterface::<6>::new_with_data_buffer_size();
 
     let msg = [0x80, 4, 2, 0x04, 0xAA, 0xBB];
-    interface.push_message(RawMessage::new(&msg));
-    interface.push_message(RawMessage::new(&msg));
+    interface.push_message(RawPacket::new(&msg));
+    interface.push_message(RawPacket::new(&msg));
 
     let mut future = pin!(interface.read_raw_data());
     let mut cx = Context::from_waker(Waker::noop());

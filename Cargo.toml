@@ -1,12 +1,14 @@
 [package]
 name = "microstrain-inertial"
 authors = ["Jeff McBride <jeff@jeffmcbride.net>"]
-description = "Library for communicating with Microstrain IMUs via MIP protocol"
-keywords = ["no_std", "embedded", "parser"]
+license = "MIT"
+description = "Library for communicating with Microstrain inertial measurement units via MIP protocol"
+keywords = ["no_std", "embedded", "parser", "IMU"]
 categories = ["embedded", "no-std", "no-std::no-alloc"]
 
 version = "0.0.1"
 edition = "2024"
+rust-version = "1.88"
 
 [dependencies]
 bbqueue = { version = "0.6.0", default-features = false, features = ["critical-section"] }

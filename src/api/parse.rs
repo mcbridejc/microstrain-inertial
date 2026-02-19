@@ -1,24 +1,5 @@
-use crate::errors::ParseError;
+#![allow(dead_code)]
 use core::convert::TryInto;
-
-#[inline]
-pub fn need(
-    bytes: &[u8],
-    descriptor_set: u8,
-    descriptor: u8,
-    need: usize,
-) -> Result<(), ParseError> {
-    if bytes.len() < need {
-        return Err(ParseError::LenTooShort {
-            descriptor_set,
-            descriptor,
-            need,
-            got: bytes.len(),
-        });
-    }
-    Ok(())
-}
-
 /// Read primitives from a byte slice, advancing the slice as you read.
 pub trait ReadBuf {
     fn remaining(&self) -> usize;

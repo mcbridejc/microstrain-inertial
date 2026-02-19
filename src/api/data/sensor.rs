@@ -1,21 +1,28 @@
 //! Sensor descriptor set (0x80) data fields.
-
+#![allow(missing_docs)]
 use crate::api::data::{Matrix3f, Quatf, Vector3f, shared::SharedField};
 use crate::api::fields::{FieldIter, FieldParse};
 
 use super::{ParseError, ReadBuf, ensure_len};
 
+/// The descriptor set for Sensor data packets
 pub const SENSOR_DESCRIPTOR_SET: u8 = 0x80;
 
+/// A wrapper for a packet containing Sensor descriptor set data fields
 pub struct SensorPacket<'a> {
     payload: &'a [u8],
 }
 
 impl<'a> SensorPacket<'a> {
+    /// Create a SensorPacket from a packet payload
+    ///
+    /// It is *assumed* that the paylaod is from a sensor data packet, and contains only data fields
+    /// belonging to theh data descriptor set.
     pub fn new(payload: &'a [u8]) -> Self {
         Self { payload }
     }
 
+    /// Get an iterator for the fields contained in the packet
     pub fn fields(&self) -> FieldIter<'a, SensorField> {
         FieldIter::new(self.payload)
     }

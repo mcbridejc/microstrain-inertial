@@ -1,20 +1,27 @@
 //! Shared descriptor set (0xFF) data fields.
-
+#![allow(missing_docs)]
 use crate::api::fields::FieldIter;
 
 use super::{ParseError, ReadBuf};
 
+/// The descriptor set for shared data packets
 pub const SHARED_DESCRIPTOR_SET: u8 = 0xFF;
 
+/// A wrapper for a packet containing Shared descriptor set data fields
 pub struct SharedPacket<'a> {
     payload: &'a [u8],
 }
 
 impl<'a> SharedPacket<'a> {
+    /// Create a SharedPacket from a packet payload
+    ///
+    /// It is *assumed* that the payload is from a shared data packet, and contains only data fields
+    /// belonging to the shared descriptor set.
     pub fn new(payload: &'a [u8]) -> Self {
         Self { payload }
     }
 
+    /// Get an iterator for the fields contained in the packet
     pub fn fields(&self) -> FieldIter<'a, SharedField> {
         FieldIter::new(self.payload)
     }
@@ -22,6 +29,7 @@ impl<'a> SharedPacket<'a> {
 
 /// A parsed Shared (0xFF) data field.
 #[derive(Debug, Clone, Copy, PartialEq)]
+#[allow(missing_docs)]
 pub enum SharedField {
     EventSource(EventSource),               // 0xD0
     Ticks(Ticks),                           // 0xD1

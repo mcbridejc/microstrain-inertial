@@ -1,21 +1,29 @@
 //! System descriptor set (0xA0) data fields.
+#![allow(missing_docs)]
 
 use crate::api::data::shared::SharedField;
 use crate::api::fields::{FieldIter, FieldParse};
 
 use super::{ParseError, ReadBuf, ensure_len};
 
+/// Descriptor set for system data packets
 pub const SYSTEM_DESCRIPTOR_SET: u8 = 0xA0;
 
+/// A wrapper for System data packets
 pub struct SystemPacket<'a> {
     payload: &'a [u8],
 }
 
 impl<'a> SystemPacket<'a> {
+    /// Create a new System packet from a payload
+    ///
+    /// It is *assumed* that the payload comes from a system data packet, and contains all fields
+    /// belonging to the system descriptor set
     pub fn new(payload: &'a [u8]) -> Self {
         Self { payload }
     }
 
+    /// Get an iterator for fields contained in the packet
     pub fn fields(&self) -> FieldIter<'a, SystemField> {
         FieldIter::new(self.payload)
     }

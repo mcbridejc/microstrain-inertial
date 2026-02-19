@@ -1,5 +1,5 @@
 //! System (0x7F) commands.
-
+#![allow(missing_docs)]
 use super::base::FunctionSelector;
 use super::{CommandField, CommandResponseData, SYSTEM_DESCRIPTOR_SET, SerializeError};
 use crate::api::parse::ReadBuf as _;

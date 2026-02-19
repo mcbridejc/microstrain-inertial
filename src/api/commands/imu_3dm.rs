@@ -1,5 +1,5 @@
 //! 3DM (0x0C) commands.
-
+#![allow(missing_docs)]
 use crate::api::types::{Matrix3f, Quatf, Vector3f};
 use crate::errors::ParseError;
 
